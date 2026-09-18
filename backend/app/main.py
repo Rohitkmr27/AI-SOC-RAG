@@ -5,6 +5,8 @@ import os
 
 from fastapi import FastAPI
 
+from app.ids.api import router as ids_router
+
 
 def configure_logging() -> None:
     """Configure application logging from the environment when needed."""
@@ -19,6 +21,7 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI-SOC-RAG Backend", version="0.1.0")
+app.include_router(ids_router)
 
 
 @app.get("/health")

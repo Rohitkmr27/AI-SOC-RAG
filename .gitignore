@@ -26,3 +26,6 @@ Thumbs.db
 # Local data (keep the directory, not its contents)
 data/*
 !data/.gitkeep
+
+# Locally trained IDS artifacts
+backend/artifacts/

@@ -2,6 +2,36 @@
 
 This repository contains the initial setup for a final-year BTech project. Stage 1 provides only a FastAPI backend health endpoint and a React + Vite frontend confirmation page.
 
+## Stage 2: Traditional IDS
+
+The IDS uses the official [CIC-IDS2017](https://www.unb.ca/cic/datasets/ids-2017.html) flow dataset. Download `MachineLearningCSV.zip` from that page and extract it under `data\raw\cicids2017\`. The loader searches recursively, so the expected result is, for example, `data\raw\cicids2017\MachineLearningCVE\*.csv`.
+
+The CSV target is normalized to `Label`. The pipeline strips headers and labels, replaces infinite values, removes exact duplicates, retains missing feature values for pipeline imputation, excludes flow/IP/timestamp identifiers to reduce capture-specific leakage, uses a stratified 80/20 split with random state 42, and fits preprocessing only on training data. The saved joblib artifact contains both preprocessing and the Random Forest classifier.
+
+Severity is project-level triage guidance only: it maps known attack labels to Informational/Medium/High/Critical, and downgrades malicious predictions below 0.60 model confidence to Low. It is not a certified risk score.
+
+Train after extracting the real data:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m app.ids.train
+```
+
+Evaluate the saved model against the deterministic held-out split:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m app.ids.evaluate
+```
+
+The actual `evaluation_metrics.json` and `confusion_matrix.csv` are written to `backend\artifacts\ids\` and are intentionally ignored by Git.
+
+After training, send a prediction request using feature names from the downloaded CSV:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/ids/predict -ContentType 'application/json' -Body '{"features":{"Destination Port":80,"Flow Duration":12345,"Total Fwd Packets":5,"Total Backward Packets":4}}'
+```
+
 No IDS, machine learning, RAG, vector database, LLM, agents, threat intelligence, dashboard, or PostgreSQL functionality is implemented at this stage.
 
 ## Prerequisites
