@@ -48,7 +48,11 @@ def test_prediction_endpoint_success(monkeypatch, sample_data: pd.DataFrame) -> 
     assert response.status_code == 200
     assert set(response.json()) == {"prediction", "confidence", "severity"}
 
-def test_prediction_endpoint_handles_missing_model() -> None:
+def test_prediction_endpoint_handles_missing_model(monkeypatch) -> None:
+    def missing_model(_):
+        raise FileNotFoundError("model missing")
+
+    monkeypatch.setattr(api, "load_model", missing_model)
     response = TestClient(app).post("/ids/predict", json={"features": {"Flow Duration": 1}})
     assert response.status_code == 503
 

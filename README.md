@@ -26,6 +26,53 @@ python -m app.ids.evaluate
 
 The actual `evaluation_metrics.json` and `confusion_matrix.csv` are written to `backend\artifacts\ids\` and are intentionally ignored by Git.
 
+## Stage 3: PostgreSQL alert management
+
+Install PostgreSQL 16 or later, then create a local development role and database from `psql` as a PostgreSQL administrator:
+
+```sql
+CREATE USER ai_soc_user WITH PASSWORD 'replace-with-a-local-secret';
+CREATE DATABASE ai_soc_rag OWNER ai_soc_user;
+```
+
+Set the connection string only in your shell or an untracked `.env` file:
+
+```powershell
+$env:DATABASE_URL = 'postgresql+psycopg://ai_soc_user:replace-with-a-local-secret@localhost:5432/ai_soc_rag'
+```
+
+Apply the initial schema migration from the repository root:
+
+```powershell
+python -m alembic upgrade head
+```
+
+The `alerts` table stores UUID IDs; event, creation, and update timestamps; IP addresses; ports; protocol; model attack type/confidence/severity; workflow status; and description. Valid statuses are `NEW`, `TRIAGED`, `INVESTIGATING`, and `RESOLVED`. The API validates IPs, port range, confidence range, severity, status, and required text.
+
+Start the backend after setting `DATABASE_URL`:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m uvicorn app.main:app --reload
+```
+
+Alert APIs:
+
+- `POST /alerts` — create a structured alert.
+- `GET /alerts?severity=High&status=NEW&attack_type=PortScan` — list and filter alerts.
+- `GET /alerts/{alert_id}` — retrieve an alert.
+- `PATCH /alerts/{alert_id}` — update only status, severity, or description.
+- `POST /alerts/from-ids` — run the existing trained IDS on supplied flow features and save that real prediction as an alert.
+
+Example alert request:
+
+```powershell
+$body = '{"timestamp":"2026-09-19T10:00:00Z","source_ip":"192.0.2.10","destination_ip":"198.51.100.20","source_port":51515,"destination_port":443,"protocol":"TCP","attack_type":"PortScan","confidence":0.91,"severity":"Medium","description":"Network-flow alert."}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/alerts -ContentType 'application/json' -Body $body
+```
+
+The test suite uses only an in-memory SQLite database through dependency overrides; it neither reads nor changes the development PostgreSQL database.
+
 After training, send a prediction request using feature names from the downloaded CSV:
 
 ```powershell
