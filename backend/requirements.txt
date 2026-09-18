@@ -6,3 +6,4 @@ scikit-learn==1.7.2
 SQLAlchemy==2.0.48
 alembic==1.18.4
 psycopg[binary]==3.3.3
+pypdf==6.8.0

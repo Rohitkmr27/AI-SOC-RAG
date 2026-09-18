@@ -73,6 +73,34 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/alerts -ContentType 'a
 
 The test suite uses only an in-memory SQLite database through dependency overrides; it neither reads nor changes the development PostgreSQL database.
 
+## Stage 4: RAG document-ingestion foundation
+
+Stage 4 creates only the local document-ingestion foundation for a future RAG system. It does not include embeddings, a vector database, retrieval, an LLM, an analyst, or an agent.
+
+```text
+data/knowledge_base/
+├── raw/        # Add legitimate, appropriately licensed .txt, .md, or .pdf documents here
+├── processed/  # Locally generated JSONL chunks
+└── README.md
+```
+
+Run ingestion from the backend directory:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m app.rag.document_loader
+```
+
+The command discovers documents recursively under `data\knowledge_base\raw`, records unreadable or unsupported files without aborting the run, and writes deterministic JSONL chunks to `data\knowledge_base\processed\chunks.jsonl`.
+
+Defaults are a 1,000-character target chunk size and 200-character word-boundary overlap. Change them when running the command if needed:
+
+```powershell
+python -m app.rag.document_loader --chunk-size 800 --chunk-overlap 150
+```
+
+Do not add fabricated threat intelligence, secrets, or malware samples. Only add documents you are permitted to use; raw documents and generated chunks remain untracked.
+
 After training, send a prediction request using feature names from the downloaded CSV:
 
 ```powershell
