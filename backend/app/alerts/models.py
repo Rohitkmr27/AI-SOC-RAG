@@ -44,7 +44,15 @@ class Alert(Base):
     protocol: Mapped[str] = mapped_column(String(20), nullable=False)
     attack_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
-    severity: Mapped[AlertSeverity] = mapped_column(Enum(AlertSeverity, name="alert_severity"), nullable=False, index=True)
+    severity: Mapped[AlertSeverity] = mapped_column(
+        Enum(
+            AlertSeverity,
+            name="alert_severity",
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
+        nullable=False,
+        index=True,
+    )
     status: Mapped[AlertStatus] = mapped_column(Enum(AlertStatus, name="alert_status"), nullable=False, default=AlertStatus.NEW, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
