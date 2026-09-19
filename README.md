@@ -278,6 +278,116 @@ Example response:
 - Live generation requires a valid `GEMINI_API_KEY` and internet access to the Google Gemini endpoint.
 - This stage provides direct question-answering only; it intentionally does not include multi-agent workflows, autonomous tool execution, alert correlation, or a frontend chat dashboard.
 
+## Stage 6: IDS Alert Intelligence / RAG Alert Enrichment
+
+Stage 6 connects the Stage 3 PostgreSQL alert management pipeline with the Stage 4.2 Qdrant retrieval and Stage 5 Gemini LLM layer to enrich detected alerts with grounded cybersecurity intelligence and structured SOC analyst recommendations.
+
+### Architecture
+
+```text
+IDS Alert
+    ↓
+Alert Retrieval
+    ↓
+Security Query Construction
+    ↓
+Qdrant Retrieval
+    ↓
+Grounded Context
+    ↓
+Gemini (Strict Analyst Prompt)
+    ↓
+SOC Analyst Enrichment
+```
+
+### API Usage: Alert Enrichment
+
+Endpoint: `POST /alerts/{alert_id}/enrich`
+
+This endpoint:
+1. Loads the alert from PostgreSQL by ID (returns 404 if not found).
+2. Synthesizes a cybersecurity search query from alert attributes (attack type, protocol, destination port, source port).
+3. Performs semantic retrieval against the local Qdrant collection (`security_knowledge_chunks`).
+4. Invokes the LLM with a strict SOC analyst prompt that strictly separates observed facts, retrieved context, and recommended investigation steps.
+5. Returns a structured JSON response without permanently altering the underlying alert record.
+
+Example request:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/alerts/123e4567-e89b-12d3-a456-426614174000/enrich
+```
+
+Example response:
+
+```json
+{
+  "alert": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2026-09-19T10:00:00Z",
+    "source_ip": "192.0.2.10",
+    "destination_ip": "198.51.100.20",
+    "source_port": 51515,
+    "destination_port": 443,
+    "protocol": "TCP",
+    "attack_type": "PortScan",
+    "confidence": 0.91,
+    "severity": "Medium",
+    "status": "NEW",
+    "description": "Network-flow alert."
+  },
+  "analysis": {
+    "summary": "PortScan alert indicates systematic reconnaissance targeting destination port 443.",
+    "observed_indicators": [
+      "TCP SYN activity targeting port 443",
+      "High confidence model score (0.91)"
+    ],
+    "security_context": [
+      "MITRE ATT&CK T1046: Network Service Discovery",
+      "Adversaries systematically probe ports to map active listening services."
+    ],
+    "investigation_steps": [
+      "Inspect firewall logs for packet bursts from source IP 192.0.2.10.",
+      "Verify if destination service responded with SYN-ACK or RST."
+    ],
+    "recommended_mitigations": [
+      "Enforce rate-limiting on inbound perimeter interfaces.",
+      "Ensure unneeded exposed ports are closed."
+    ]
+  },
+  "sources": [
+    {
+      "source": "mitre/parsed/techniques-attack-pattern--t1046.md",
+      "file_name": "t1046.md",
+      "document_id": "doc_ps",
+      "chunk_id": "chunk_t1046",
+      "chunk_index": 1,
+      "score": 0.88,
+      "title": "Network Service Discovery"
+    }
+  ]
+}
+```
+
+### Advisory Grounding and Safety
+
+- **Decision-Support Only**: Generated alert analyses are advisory triage aids for security analysts. They do not trigger automated firewall blocking or intrusive remediations.
+- **Strict Grounding**: The analyst prompt forbids inventing attack attribution, fake incidents, or unverified MITRE IDs. It explicitly instructs the model never to assert an alert proves a compromise unless verified by facts.
+- **Empty Retrieval Fallback**: If no relevant knowledge base chunks match the alert, a grounded fallback summary is returned without querying the LLM.
+
+### Testing Instructions
+
+Run alert enrichment tests:
+
+```powershell
+python -m pytest tests/test_alert_enrichment.py
+```
+
+Run the complete test suite:
+
+```powershell
+python -m pytest -q
+```
+
 ## Prerequisites
 
 - Python 3.11 or later

@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, field_validator
 
 from app.alerts.models import AlertSeverity, AlertStatus
+from app.rag.schemas import RAGSource
 
 
 class AlertBase(BaseModel):
@@ -61,3 +62,19 @@ class IdsAlertCreate(BaseModel):
     destination_port: int = Field(ge=0, le=65535)
     protocol: str = Field(min_length=1, max_length=20)
     features: dict[str, object] = Field(min_length=1)
+
+
+class AlertAnalysis(BaseModel):
+    """Structured security analysis generated from retrieved cybersecurity knowledge."""
+    summary: str
+    observed_indicators: list[str] = Field(default_factory=list)
+    security_context: list[str] = Field(default_factory=list)
+    investigation_steps: list[str] = Field(default_factory=list)
+    recommended_mitigations: list[str] = Field(default_factory=list)
+
+
+class AlertEnrichmentResponse(BaseModel):
+    """Response containing original alert details, grounded analysis, and retrieved sources."""
+    alert: AlertResponse
+    analysis: AlertAnalysis
+    sources: list[RAGSource] = Field(default_factory=list)

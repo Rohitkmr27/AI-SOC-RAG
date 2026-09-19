@@ -9,9 +9,18 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.alerts.models import AlertSeverity, AlertStatus
-from app.alerts.schemas import AlertCreate, AlertResponse, AlertUpdate, IdsAlertCreate
+from app.alerts.schemas import (
+    AlertCreate,
+    AlertEnrichmentResponse,
+    AlertResponse,
+    AlertUpdate,
+    IdsAlertCreate,
+)
 from app.alerts.service import create_alert, get_alert, list_alerts, update_alert
 from app.database import get_db
+from app.rag.alert_enrichment import enrich_alert
+from app.rag.api import get_llm_provider
+from app.rag.llm import LLMProvider
 from app.ids.config import DEFAULT_ARTIFACT_DIRECTORY, MODEL_FILENAME
 from app.ids.model import load_model
 from app.ids.prediction import predict_flow
@@ -98,3 +107,36 @@ def patch_alert(alert_id: uuid.UUID, payload: AlertUpdate, session: Session = De
         return update_alert(session, alert, payload)
     except SQLAlchemyError as error:
         raise database_error(session, error) from error
+
+
+@router.post("/{alert_id}/enrich", response_model=AlertEnrichmentResponse)
+def enrich_alert_endpoint(
+    alert_id: uuid.UUID,
+    session: Session = Depends(get_db),
+    llm: LLMProvider = Depends(get_llm_provider),
+) -> AlertEnrichmentResponse:
+    """Enrich an existing alert with grounded RAG cybersecurity analysis."""
+    try:
+        alert = get_alert(session, alert_id)
+    except SQLAlchemyError as error:
+        raise database_error(session, error) from error
+
+    if alert is None:
+        raise HTTPException(status_code=404, detail="Alert not found.")
+
+    try:
+        analysis, sources = enrich_alert(alert, llm_client=llm)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        logger.error("Alert enrichment unavailable: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Generation service unavailable: {error}",
+        ) from error
+
+    return AlertEnrichmentResponse(
+        alert=AlertResponse.model_validate(alert),
+        analysis=analysis,
+        sources=sources,
+    )
