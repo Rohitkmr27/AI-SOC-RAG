@@ -16,6 +16,7 @@ from app.alerts.schemas import (
     AlertUpdate,
     CorrelationResponse,
     IdsAlertCreate,
+    IncidentInvestigationResponse,
     IncidentResponse,
 )
 from app.alerts.service import (
@@ -29,6 +30,7 @@ from app.alerts.correlation import DEFAULT_CORRELATION_WINDOW_MINUTES, correlate
 from app.database import get_db
 from app.rag.alert_enrichment import enrich_alert
 from app.rag.api import get_llm_provider
+from app.rag.incident_investigation import investigate_incident
 from app.rag.llm import LLMProvider
 from app.ids.config import DEFAULT_ARTIFACT_DIRECTORY, MODEL_FILENAME
 from app.ids.model import load_model
@@ -145,6 +147,49 @@ def get_one_incident(
             return inc
 
     raise HTTPException(status_code=404, detail="Incident not found.")
+
+
+@router.post("/correlations/{incident_id}/investigate", response_model=IncidentInvestigationResponse)
+def investigate_incident_endpoint(
+    incident_id: uuid.UUID,
+    lookback_minutes: int = Query(default=60, ge=1, le=10080),
+    correlation_window_minutes: int = Query(default=DEFAULT_CORRELATION_WINDOW_MINUTES, ge=1, le=1440),
+    top_k: int = Query(default=5, ge=1, le=20),
+    session: Session = Depends(get_db),
+    llm: LLMProvider = Depends(get_llm_provider),
+) -> IncidentInvestigationResponse:
+    """Investigate a correlated incident with grounded multi-chunk RAG cyber intelligence synthesis."""
+    try:
+        alerts = list_recent_alerts(session, lookback_minutes=lookback_minutes)
+    except SQLAlchemyError as error:
+        raise database_error(session, error) from error
+
+    incidents = correlate_alerts(alerts, correlation_window_minutes=correlation_window_minutes)
+    target_incident = None
+    for inc in incidents:
+        if inc.incident_id == incident_id:
+            target_incident = inc
+            break
+
+    if target_incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found.")
+
+    try:
+        investigation, sources = investigate_incident(target_incident, llm_client=llm, top_k=top_k)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        logger.error("Incident investigation unavailable: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Generation service unavailable: {error}",
+        ) from error
+
+    return IncidentInvestigationResponse(
+        incident=target_incident,
+        investigation=investigation,
+        sources=sources,
+    )
 
 
 @router.get("/{alert_id}", response_model=AlertResponse)

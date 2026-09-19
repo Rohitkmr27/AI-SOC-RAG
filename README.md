@@ -488,6 +488,125 @@ Run full test suite:
 python -m pytest -q
 ```
 
+## Stage 8: AI SOC Incident Investigation Engine
+
+Stage 8 synthesizes correlated incident campaign data from Stage 7 with grounded multi-chunk RAG cyber intelligence from Stage 4.2 to generate structured, explainable AI SOC investigation reports.
+
+### Architecture
+
+```text
+Correlated Incident Campaign (Stage 7)
+        ↓
+Incident Query Synthesis (Attack Types, Ports, Protocols)
+        ↓
+Qdrant Vector Retrieval (security_knowledge_chunks)
+        ↓
+Bounded Multi-Chunk Grounded Context
+        ↓
+Gemini LLM (Strict Analyst System Prompt)
+        ↓
+Structured Incident Investigation Report
+```
+
+### API Usage
+
+Endpoint: `POST /alerts/correlations/{incident_id}/investigate`
+
+Query Parameters:
+- `lookback_minutes`: Minutes of historical alert data to fetch (default: 60).
+- `correlation_window_minutes`: Incident correlation grouping window (default: 15).
+- `top_k`: Maximum retrieved cybersecurity chunks (default: 5).
+
+Example request:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/alerts/correlations/a1b2c3d4-e5f6-5a6b-7c8d-9e0f1a2b3c4d/investigate?top_k=5"
+```
+
+Example response:
+
+```json
+{
+  "incident": {
+    "incident_id": "a1b2c3d4-e5f6-5a6b-7c8d-9e0f1a2b3c4d",
+    "alert_count": 2,
+    "first_seen": "2026-09-19T10:00:00Z",
+    "last_seen": "2026-09-19T10:10:00Z",
+    "source_ips": ["192.0.2.10"],
+    "destination_ips": ["198.51.100.20"],
+    "attack_types": ["PortScan", "SSH-Bruteforce"],
+    "risk_score": 85,
+    "risk_factors": ["Base severity: High (75 pts)", "Multiple distinct attack types observed"],
+    "alert_ids": ["123e4567-e89b-12d3-a456-426614174000", "223e4567-e89b-12d3-a456-426614174001"]
+  },
+  "investigation": {
+    "executive_summary": "Correlated incident campaign involving initial PortScan reconnaissance followed by SSH-Bruteforce authentication attempts from 192.0.2.10.",
+    "observed_evidence": [
+      "Correlated Alert Count: 2",
+      "Observed Attack Types: PortScan, SSH-Bruteforce",
+      "Deterministic Risk Score: 85 / 100"
+    ],
+    "threat_context": [
+      "Adversaries perform network service discovery (T1046) to identify listening SSH endpoints before initiating credential brute force (T1110)."
+    ],
+    "investigation_priorities": [
+      "Verify SSH authentication logs on destination 198.51.100.20 for successful logins from 192.0.2.10.",
+      "Check firewall logs for concurrent network probes targeting other high-value internal assets."
+    ],
+    "recommended_actions": [
+      "Confirm connection state and session duration for SSH attempts.",
+      "Inspect source IP 192.0.2.10 against external threat intelligence blocklists."
+    ],
+    "mitigations": [
+      "Temporarily drop inbound traffic from 192.0.2.10 at perimeter firewall.",
+      "Enforce fail2ban and rate-limiting on port 22."
+    ],
+    "mitre_context": [
+      "MITRE ATT&CK T1110: Brute Force",
+      "MITRE ATT&CK T1046: Network Service Discovery"
+    ],
+    "limitations": [
+      "Analysis is advisory decision-support based on retrieved knowledge base sources.",
+      "Does not execute automated network remediation."
+    ]
+  },
+  "sources": [
+    {
+      "source": "mitre/parsed/techniques-attack-pattern--t1110.md",
+      "file_name": "t1110.md",
+      "document_id": "doc_bf",
+      "chunk_id": "chunk_t1110",
+      "chunk_index": 1,
+      "score": 0.92,
+      "title": "Brute Force"
+    }
+  ]
+}
+```
+
+### Safety & Analytical Boundaries
+
+- **Advisory Support Only**: Investigation reports provide grounded decision-support for human SOC analysts. The system performs no autonomous firewall blocking or host remediation.
+- **Risk Score Immutability**: The LLM cannot alter or question the deterministic risk score (0–100), alert count, or severity calculated by Stage 7 rules.
+- **Strict Grounding Guard**: Prompts strictly prohibit inventing evidence, attack attribution, or fake MITRE ATT&CK technique IDs.
+- **Empty Retrieval Fallback**: If semantic search returns zero matching chunks from Qdrant, an explicit fallback investigation report is returned without making an LLM API call.
+
+### Testing Instructions
+
+Run incident investigation tests:
+
+```powershell
+python -m pytest tests/test_incident_investigation.py
+```
+
+Run full test suite:
+
+```powershell
+python -m pytest -q
+```
+
+
+
 ## Prerequisites
 
 - Python 3.11 or later

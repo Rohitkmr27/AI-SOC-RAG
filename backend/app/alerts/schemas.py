@@ -101,3 +101,22 @@ class CorrelationResponse(BaseModel):
     total_correlated_alerts: int = Field(ge=0)
     lookback_minutes: int = Field(ge=1)
     correlation_window_minutes: int = Field(ge=1)
+
+
+class IncidentInvestigation(BaseModel):
+    """Structured AI SOC investigation report generated from grounded cybersecurity knowledge."""
+    executive_summary: str
+    observed_evidence: list[str] = Field(default_factory=list)
+    threat_context: list[str] = Field(default_factory=list)
+    investigation_priorities: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+    mitigations: list[str] = Field(default_factory=list)
+    mitre_context: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class IncidentInvestigationResponse(BaseModel):
+    """Response containing correlated incident details, grounded investigation report, and sources."""
+    incident: IncidentResponse
+    investigation: IncidentInvestigation
+    sources: list[RAGSource] = Field(default_factory=list)
