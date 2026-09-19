@@ -14,9 +14,18 @@ from app.alerts.schemas import (
     AlertEnrichmentResponse,
     AlertResponse,
     AlertUpdate,
+    CorrelationResponse,
     IdsAlertCreate,
+    IncidentResponse,
 )
-from app.alerts.service import create_alert, get_alert, list_alerts, update_alert
+from app.alerts.service import (
+    create_alert,
+    get_alert,
+    list_alerts,
+    list_recent_alerts,
+    update_alert,
+)
+from app.alerts.correlation import DEFAULT_CORRELATION_WINDOW_MINUTES, correlate_alerts
 from app.database import get_db
 from app.rag.alert_enrichment import enrich_alert
 from app.rag.api import get_llm_provider
@@ -85,6 +94,57 @@ def create_alert_from_ids(payload: IdsAlertCreate, session: Session = Depends(ge
         return create_alert(session, alert_payload)
     except SQLAlchemyError as error:
         raise database_error(session, error) from error
+
+
+@router.get("/correlations", response_model=CorrelationResponse)
+def get_alert_correlations(
+    lookback_minutes: int = Query(default=60, ge=1, le=10080),
+    correlation_window_minutes: int = Query(default=DEFAULT_CORRELATION_WINDOW_MINUTES, ge=1, le=1440),
+    source_ip: str | None = Query(default=None),
+    minimum_risk_score: int | None = Query(default=None, ge=0, le=100),
+    session: Session = Depends(get_db),
+) -> CorrelationResponse:
+    """Retrieve deterministic incident groups formed from correlated alerts."""
+    try:
+        alerts = list_recent_alerts(session, lookback_minutes=lookback_minutes, source_ip=source_ip)
+    except SQLAlchemyError as error:
+        raise database_error(session, error) from error
+
+    incidents = correlate_alerts(alerts, correlation_window_minutes=correlation_window_minutes)
+
+    if minimum_risk_score is not None:
+        incidents = [inc for inc in incidents if inc.risk_score >= minimum_risk_score]
+
+    total_correlated_alerts = sum(inc.alert_count for inc in incidents)
+
+    return CorrelationResponse(
+        incidents=incidents,
+        total_incidents=len(incidents),
+        total_correlated_alerts=total_correlated_alerts,
+        lookback_minutes=lookback_minutes,
+        correlation_window_minutes=correlation_window_minutes,
+    )
+
+
+@router.get("/correlations/{incident_id}", response_model=IncidentResponse)
+def get_one_incident(
+    incident_id: uuid.UUID,
+    lookback_minutes: int = Query(default=60, ge=1, le=10080),
+    correlation_window_minutes: int = Query(default=DEFAULT_CORRELATION_WINDOW_MINUTES, ge=1, le=1440),
+    session: Session = Depends(get_db),
+) -> IncidentResponse:
+    """Retrieve a specific correlated incident group by incident ID."""
+    try:
+        alerts = list_recent_alerts(session, lookback_minutes=lookback_minutes)
+    except SQLAlchemyError as error:
+        raise database_error(session, error) from error
+
+    incidents = correlate_alerts(alerts, correlation_window_minutes=correlation_window_minutes)
+    for inc in incidents:
+        if inc.incident_id == incident_id:
+            return inc
+
+    raise HTTPException(status_code=404, detail="Incident not found.")
 
 
 @router.get("/{alert_id}", response_model=AlertResponse)

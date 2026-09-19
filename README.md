@@ -388,6 +388,106 @@ Run the complete test suite:
 python -m pytest -q
 ```
 
+## Stage 7: Alert Correlation and Deterministic Risk Scoring
+
+Stage 7 clusters individual PostgreSQL alerts into correlated incident campaigns and calculates an explainable, bounded risk score (0–100) using purely deterministic security rules without using LLMs or machine learning heuristics for risk computation.
+
+### Architecture
+
+```text
+Multiple IDS Alerts
+        ↓
+PostgreSQL Database
+        ↓
+Correlation Engine (BFS Connected Components)
+        ↓
+Related Alert Groups (Incidents)
+        ↓
+Deterministic Risk Scoring (0–100)
+        ↓
+Incident Summary
+```
+
+### Correlation Rule & Time Window
+
+- **Time Window**: Default correlation window is **15 minutes** (configurable via `--correlation-window-minutes`).
+- **Deterministic Rule**: Two alerts are linked if:
+  1. They occur within the correlation window (`abs(timestamp_1 - timestamp_2) <= window_minutes`).
+  2. **AND** they share `source_ip` **OR** `destination_ip`.
+- Connected components (graph BFS) group indirectly linked alerts into unified Incident objects.
+- Alerts within each incident are deterministically ordered by timestamp (ascending) with stable tie-breaking using the UUID string representation.
+
+### Risk Scoring Formula & Factors
+
+The risk score is computed from explicit, explainable security properties:
+
+$$\text{Risk Score} = \text{min}\left(100, \max\left(0, \text{Base Severity} + \text{Confidence} + \text{Volume} + \text{Diversity} + \text{Repeated Source} + \text{Temporal Concentration}\right)\right)$$
+
+1. **Base Severity Weight**: Highest severity alert in the incident (`Informational`=10, `Low`=25, `Medium`=50, `High`=75, `Critical`=100).
+2. **Confidence Contribution**: $\text{int}(\text{Average Confidence} \times 15)$ (up to +15 pts).
+3. **Alert Volume Contribution**: $\min((\text{alert\_count} - 1) \times 10, 25)$ (up to +25 pts).
+4. **Attack Diversity Contribution**: $\min((\text{distinct\_attack\_types} - 1) \times 10, 20)$ (up to +20 pts).
+5. **Repeated Source IP**: +10 pts if any source IP generates multiple alerts in the incident.
+6. **Temporal Concentration**: +10 pts if multiple alerts occur within 5 minutes.
+
+> **Risk Score Disclaimer**: The risk score is a deterministic prioritization heuristic. It is not a probability of compromise and has not been clinically, statistically, or operationally validated as such.
+
+### API Usage
+
+Fetch correlated incidents:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/alerts/correlations?lookback_minutes=60&correlation_window_minutes=15&minimum_risk_score=50"
+```
+
+Example response:
+
+```json
+{
+  "incidents": [
+    {
+      "incident_id": "a1b2c3d4-e5f6-5a6b-7c8d-9e0f1a2b3c4d",
+      "alert_count": 2,
+      "first_seen": "2026-09-19T10:00:00Z",
+      "last_seen": "2026-09-19T10:10:00Z",
+      "source_ips": ["192.0.2.55"],
+      "destination_ips": ["198.51.100.88", "198.51.100.89"],
+      "attack_types": ["BruteForce", "PortScan"],
+      "risk_score": 100,
+      "risk_factors": [
+        "Base severity: High (75 pts)",
+        "High model confidence (avg: 0.90)",
+        "Multiple correlated alerts (2 alerts in incident)",
+        "Multiple distinct attack types observed (2 types: BruteForce, PortScan)",
+        "Repeated source IP activity"
+      ],
+      "alert_ids": [
+        "123e4567-e89b-12d3-a456-426614174000",
+        "223e4567-e89b-12d3-a456-426614174001"
+      ]
+    }
+  ],
+  "total_incidents": 1,
+  "total_correlated_alerts": 2,
+  "lookback_minutes": 60,
+  "correlation_window_minutes": 15
+}
+```
+
+### Testing Instructions
+
+Run alert correlation tests:
+
+```powershell
+python -m pytest tests/test_alert_correlation.py
+```
+
+Run full test suite:
+
+```powershell
+python -m pytest -q
+```
+
 ## Prerequisites
 
 - Python 3.11 or later

@@ -78,3 +78,26 @@ class AlertEnrichmentResponse(BaseModel):
     alert: AlertResponse
     analysis: AlertAnalysis
     sources: list[RAGSource] = Field(default_factory=list)
+
+
+class IncidentResponse(BaseModel):
+    """Deterministic grouping of correlated alerts into an incident campaign."""
+    incident_id: uuid.UUID
+    alert_count: int = Field(ge=1)
+    first_seen: datetime
+    last_seen: datetime
+    source_ips: list[str] = Field(default_factory=list)
+    destination_ips: list[str] = Field(default_factory=list)
+    attack_types: list[str] = Field(default_factory=list)
+    risk_score: int = Field(ge=0, le=100)
+    risk_factors: list[str] = Field(default_factory=list)
+    alert_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class CorrelationResponse(BaseModel):
+    """Container for correlated incident groups and overview metadata."""
+    incidents: list[IncidentResponse] = Field(default_factory=list)
+    total_incidents: int = Field(ge=0)
+    total_correlated_alerts: int = Field(ge=0)
+    lookback_minutes: int = Field(ge=1)
+    correlation_window_minutes: int = Field(ge=1)

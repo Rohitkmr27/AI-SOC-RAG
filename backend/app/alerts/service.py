@@ -1,6 +1,7 @@
 """Alert persistence operations shared by API routes and IDS integration."""
 
 from collections.abc import Sequence
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,14 @@ def list_alerts(session: Session, severity: AlertSeverity | None, status: AlertS
         statement = statement.where(Alert.status == status)
     if attack_type:
         statement = statement.where(Alert.attack_type == attack_type)
+    return session.scalars(statement).all()
+
+
+def list_recent_alerts(session: Session, lookback_minutes: int, source_ip: str | None = None) -> Sequence[Alert]:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
+    statement = select(Alert).where(Alert.timestamp >= cutoff).order_by(Alert.timestamp.asc())
+    if source_ip and source_ip.strip():
+        statement = statement.where(Alert.source_ip == source_ip.strip())
     return session.scalars(statement).all()
 
 
