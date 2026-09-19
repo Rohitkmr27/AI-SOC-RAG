@@ -13,4 +13,6 @@ PyJWT==2.14.0
 passlib==1.7.4
 bcrypt==5.0.0
 email-validator==2.3.0
+python-dotenv==1.0.1
+
 

@@ -83,10 +83,12 @@ def test_invalid_alert_and_missing_alert(client: TestClient, alert_payload: dict
     assert client.get("/alerts/00000000-0000-0000-0000-000000000000").status_code == 404
 
 
-def test_database_not_configured_returns_safe_error() -> None:
+def test_database_not_configured_returns_safe_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     app.dependency_overrides.clear()
     app.dependency_overrides[get_current_user] = lambda: mock_analyst
     response = TestClient(app).get("/alerts")
     assert response.status_code == 503
     assert response.json()["detail"] == "Alert database is not configured."
+
 

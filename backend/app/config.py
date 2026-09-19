@@ -4,7 +4,22 @@ import logging
 import os
 import re
 from enum import Enum
+from pathlib import Path
 from typing import Any
+
+try:
+    from dotenv import load_dotenv
+
+    # Load root or backend .env file if present
+    root_dir = Path(__file__).resolve().parents[2]
+    dotenv_path = root_dir / ".env"
+    if dotenv_path.is_file():
+        load_dotenv(dotenv_path)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
+
 
 DEFAULT_DEV_JWT_SECRET = "ai-soc-rag-dev-jwt-secret-key-32bytesmin"
 DEFAULT_DEV_CORS_ORIGINS = [
@@ -103,11 +118,19 @@ def get_cors_allowed_origins() -> list[str]:
 
 
 def get_database_url() -> str | None:
-    """Retrieve the configured PostgreSQL database URL."""
+    """Retrieve and normalize the configured PostgreSQL database URL."""
     url = os.getenv("DATABASE_URL", "").strip()
     if is_production() and not url:
         raise ConfigurationError("DATABASE_URL must be configured in production mode.")
-    return url if url else None
+    if not url:
+        return None
+    # Normalize Render postgres:// or postgresql:// schemes for SQLAlchemy 2.0 + psycopg3
+    if url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
 
 
 def get_log_level() -> int:
