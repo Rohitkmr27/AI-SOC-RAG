@@ -75,7 +75,7 @@ The test suite uses only an in-memory SQLite database through dependency overrid
 
 ## Stage 4: RAG document-ingestion foundation
 
-Stage 4 creates only the local document-ingestion foundation for a future RAG system. It does not include embeddings, a vector database, retrieval, an LLM, an analyst, or an agent.
+Stage 4 creates the local document-ingestion foundation for a future RAG system. It writes deterministic JSONL chunks and does not include an LLM, analyst, or agent.
 
 ```text
 data/knowledge_base/
@@ -107,7 +107,70 @@ After training, send a prediction request using feature names from the downloade
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/ids/predict -ContentType 'application/json' -Body '{"features":{"Destination Port":80,"Flow Duration":12345,"Total Fwd Packets":5,"Total Backward Packets":4}}'
 ```
 
-No IDS, machine learning, RAG, vector database, LLM, agents, threat intelligence, dashboard, or PostgreSQL functionality is implemented at this stage.
+Stage 4 does not modify IDS, machine learning, alert, PostgreSQL, or API functionality, and does not add generation, an LLM, agents, threat intelligence, or a dashboard.
+
+## Stage 4.2: Embeddings, vector database, and indexing
+
+Stage 4.2 embeds the existing `data\knowledge_base\processed\chunks.jsonl` file with the local CPU-compatible `sentence-transformers/all-MiniLM-L6-v2` model. Vectors are normalized for cosine similarity and stored in a persistent, Docker-free Qdrant local store:
+
+```text
+data/knowledge_base/vector_store/
+```
+
+The first embedding run downloads the model from Hugging Face if it is not already present in the local Sentence Transformers cache. No API key or external embedding API is used. After that download, indexing and search can run offline. The model is loaded lazily, so ingestion-only commands do not load it.
+
+Install the backend dependencies, generate Stage 4 chunks if needed, then index them from `backend`:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m app.rag.index
+```
+
+Search the indexed chunks with the same model:
+
+```powershell
+python -m app.rag.search "what is a brute force attack"
+python -m app.rag.search "what is a brute force attack" --top-k 3 --score-threshold 0.4
+```
+
+Indexing safely recreates the `security_knowledge_chunks` collection and reports the indexed chunk count and actual embedding dimension. Search returns similarity scores and the original chunk metadata, including source, file name, title when present, and content. The vector store and generated chunks are local derived data and remain untracked.
+
+Limitations: retrieval quality depends on the legitimate documents placed in the knowledge base; the small MiniLM model is not domain-specialized; Qdrant local mode is intended for development and single-process local use; and this stage deliberately adds no generation, LLM, agent, dashboard, or authentication behavior.
+
+## Stage 4.3: Official knowledge-base bootstrap
+
+Stage 4.3 downloads source material from official locations only. The configured sources are:
+
+- MITRE ATT&CK Enterprise STIX data from the official MITRE ATT&CK STIX repository.
+- NIST Cybersecurity Framework 2.0 from an official NIST publication URL.
+- OWASP Top 10:2025 from the official OWASP project page.
+- CISA Cross-Sector Cybersecurity Performance Goals from an official CISA PDF URL.
+
+Run the downloader from the backend directory:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m app.rag.source_downloader
+```
+
+Use `--force` to refresh files that already exist, or `--timeout 60` to change the per-request timeout:
+
+```powershell
+python -m app.rag.source_downloader --force --timeout 60
+```
+
+The command creates the source directories under `data\knowledge_base\raw\`, skips existing files unless forced, and prints JSON counts for downloaded, skipped, and failed sources. It records source name, official URL, local filename, UTC download timestamp, source type, and known version in `data\knowledge_base\source_manifest.json`. Failed downloads are reported and never replaced with fabricated content.
+
+MITRE's official STIX JSON is retained at `data\knowledge_base\raw\mitre\enterprise-attack.json`. The downloader also deterministically creates one Markdown file per selected technique, tactic, group, software, or mitigation under `data\knowledge_base\raw\mitre\parsed\` so the existing TXT/Markdown/PDF ingestion flow does not turn the entire STIX bundle into one giant chunk. This is a structured transformation of downloaded STIX fields, not a manual summary.
+
+After downloading or refreshing sources, run the existing ingestion and index commands:
+
+```powershell
+python -m app.rag.document_loader
+python -m app.rag.index
+```
+
+The generated `chunks.jsonl`, local Qdrant store, source manifest, downloaded documents, and MITRE parsed output are local derived data. They should not be blindly committed to Git, especially the large MITRE dataset or vector database. The downloader code, configuration, tests, and documentation are the tracked project artifacts.
 
 ## Prerequisites
 

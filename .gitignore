@@ -32,6 +32,10 @@ data/*
 !data/knowledge_base/raw/.gitkeep
 !data/knowledge_base/processed/
 !data/knowledge_base/processed/.gitkeep
+!data/knowledge_base/vector_store/
+data/knowledge_base/vector_store/*
+data/knowledge_base/source_manifest.json
+data/knowledge_base/processed/chunks.jsonl
 
 # Locally trained IDS artifacts
 backend/artifacts/
