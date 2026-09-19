@@ -3,13 +3,14 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.auth.dependencies import get_current_user
 from app.rag.generator import generate_rag_answer
 from app.rag.llm import GeminiProvider, LLMProvider
 from app.rag.schemas import RAGRequest, RAGResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/rag", tags=["rag"])
+router = APIRouter(prefix="/rag", tags=["rag"], dependencies=[Depends(get_current_user)])
 
 
 def get_llm_provider() -> LLMProvider:

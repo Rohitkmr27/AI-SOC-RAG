@@ -14,8 +14,17 @@ BACKEND_DIRECTORY = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_DIRECTORY))
 
 from app.alerts.models import Base
+from app.auth.dependencies import get_current_user
+from app.auth.models import User, UserRole
 from app.database import get_db
 from app.main import app
+
+mock_analyst = User(
+    id="00000000-0000-0000-0000-000000000001",
+    username="test_analyst",
+    role=UserRole.ANALYST,
+    is_active=True,
+)
 
 
 @pytest.fixture
@@ -29,6 +38,7 @@ def client() -> TestClient:
             yield session
 
     app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_user] = lambda: mock_analyst
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -75,6 +85,8 @@ def test_invalid_alert_and_missing_alert(client: TestClient, alert_payload: dict
 
 def test_database_not_configured_returns_safe_error() -> None:
     app.dependency_overrides.clear()
+    app.dependency_overrides[get_current_user] = lambda: mock_analyst
     response = TestClient(app).get("/alerts")
     assert response.status_code == 503
     assert response.json()["detail"] == "Alert database is not configured."
+

@@ -255,6 +255,23 @@ def test_successful_generation_with_mocked_llm(monkeypatch: pytest.MonkeyPatch) 
 # 8. FastAPI Endpoint Tests
 # ==========================================
 
+from app.auth.dependencies import get_current_user
+from app.auth.models import User, UserRole
+
+mock_analyst = User(
+    username="test_analyst",
+    role=UserRole.ANALYST,
+    is_active=True,
+)
+
+
+@pytest.fixture(autouse=True)
+def override_auth():
+    app.dependency_overrides[get_current_user] = lambda: mock_analyst
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_rag_api_endpoint_success(monkeypatch: pytest.MonkeyPatch) -> None:
     test_chunks = [make_test_chunk(chunk_id="c_api", score=0.91)]
     monkeypatch.setattr("app.rag.generator.search_chunks", lambda **kwargs: test_chunks)
@@ -273,7 +290,7 @@ def test_rag_api_endpoint_success(monkeypatch: pytest.MonkeyPatch) -> None:
         assert data["sources"][0]["chunk_id"] == "c_api"
         assert data["sources"][0]["score"] == pytest.approx(0.91)
     finally:
-        app.dependency_overrides.clear()
+        app.dependency_overrides.pop(get_llm_provider, None)
 
 
 def test_rag_api_endpoint_empty_retrieval(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -291,7 +308,7 @@ def test_rag_api_endpoint_empty_retrieval(monkeypatch: pytest.MonkeyPatch) -> No
         assert data["sources"] == []
         assert len(mock_llm.calls) == 0
     finally:
-        app.dependency_overrides.clear()
+        app.dependency_overrides.pop(get_llm_provider, None)
 
 
 def test_rag_api_endpoint_validation_error() -> None:
@@ -314,6 +331,7 @@ def test_rag_api_endpoint_missing_api_key_returns_503(monkeypatch: pytest.Monkey
 
     assert res.status_code == 503
     assert "GEMINI_API_KEY" in res.json()["detail"]
+
 
 
 # ==========================================

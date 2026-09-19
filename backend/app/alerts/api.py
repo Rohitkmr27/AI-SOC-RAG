@@ -32,13 +32,15 @@ from app.rag.alert_enrichment import enrich_alert
 from app.rag.api import get_llm_provider
 from app.rag.incident_investigation import investigate_incident
 from app.rag.llm import LLMProvider
+from app.auth.dependencies import get_current_user
+from app.auth.models import User
 from app.ids.config import DEFAULT_ARTIFACT_DIRECTORY, MODEL_FILENAME
 from app.ids.model import load_model
 from app.ids.prediction import predict_flow
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/alerts", tags=["alerts"])
+router = APIRouter(prefix="/alerts", tags=["alerts"], dependencies=[Depends(get_current_user)])
 
 
 def database_error(session: Session, error: SQLAlchemyError) -> HTTPException:

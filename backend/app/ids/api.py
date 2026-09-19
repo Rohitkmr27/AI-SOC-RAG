@@ -2,14 +2,15 @@
 
 import logging
 from typing import Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from app.auth.dependencies import get_current_user
 from app.ids.config import DEFAULT_ARTIFACT_DIRECTORY, MODEL_FILENAME
 from app.ids.model import load_model
 from app.ids.prediction import predict_flow
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/ids", tags=["ids"])
+router = APIRouter(prefix="/ids", tags=["ids"], dependencies=[Depends(get_current_user)])
 
 class FlowPredictionRequest(BaseModel):
     """Feature keys must exactly match the columns used when training."""

@@ -9,12 +9,28 @@ from fastapi.testclient import TestClient
 BACKEND_DIRECTORY = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_DIRECTORY))
 
+from app.auth.dependencies import get_current_user
+from app.auth.models import User, UserRole
 from app.ids import api
 from app.ids.feature_preparation import prepare_features
 from app.ids.model import build_model_pipeline, load_model, save_model
 from app.ids.prediction import predict_flow
 from app.ids.validation import DataValidationError, validate_and_clean_dataset
 from app.main import app
+
+mock_analyst = User(
+    username="test_analyst",
+    role=UserRole.ANALYST,
+    is_active=True,
+)
+
+
+@pytest.fixture(autouse=True)
+def override_auth():
+    app.dependency_overrides[get_current_user] = lambda: mock_analyst
+    yield
+    app.dependency_overrides.clear()
+
 
 @pytest.fixture
 def sample_data() -> pd.DataFrame:

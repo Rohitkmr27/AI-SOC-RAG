@@ -295,8 +295,16 @@ def test_investigate_incident_llm_failure(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 # ==========================================
-# 4. FastAPI Endpoint Integration Tests
-# ==========================================
+from app.auth.dependencies import get_current_user
+from app.auth.models import User, UserRole
+
+mock_analyst = User(
+    id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+    username="test_analyst",
+    role=UserRole.ANALYST,
+    is_active=True,
+)
+
 
 @pytest.fixture
 def sqlite_client() -> TestClient:
@@ -309,10 +317,12 @@ def sqlite_client() -> TestClient:
             yield session
 
     app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_user] = lambda: mock_analyst
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
     Base.metadata.drop_all(engine)
+
 
 
 def test_api_investigate_incident_success(sqlite_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -658,6 +658,61 @@ Set-Location C:\AI-SOC-RAG\frontend
    ```
    This runs `tsc && vite build` and generates the production bundle under `frontend/dist/`.
 
+## Stage 10: Authentication, Authorization & Security Hardening
+
+Stage 10 introduces secure analyst authentication, role-based authorization (RBAC), and security hardening across the backend and frontend.
+
+### Features & Architecture
+
+- **PostgreSQL User Schema**: `users` table storing user UUID, unique username, unique email, bcrypt password hash, role (`ANALYST`, `ADMIN`), active state (`is_active`), and timestamps (`created_at`, `updated_at`).
+- **Security & Tokens**: Passwords hashed with `bcrypt` (salt rounds=12); authentication via signed JSON Web Tokens (`HS256`, default 60-min expiration).
+- **FastAPI Auth Dependencies**: `get_current_user`, `require_analyst`, and `require_admin` FastAPI dependencies enforce Bearer token verification on operational endpoints.
+- **CLI Admin Initializer**: CLI script (`python -m app.auth.init_admin`) seeds or updates the initial administrator account from environment variables (`ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+- **Protected Endpoints**: `/alerts`, `/alerts/correlations`, `/ids/predict`, `/rag/query` require a valid JWT token. `/health` remains public for readiness probes.
+- **CORS Hardening**: Strict origin whitelist configured via `CORS_ALLOWED_ORIGINS` environment variable.
+- **Frontend Auth System**: React `AuthContext`, `ProtectedRoute` wrapper component, `/login` page with dark SOC styling, Axios request header interceptor, and 401 response auto-logout interceptor.
+
+### Authentication API Usage
+
+#### 1. Login (`POST /auth/login`)
+
+```powershell
+$loginBody = '{"username":"admin","password":"replace-with-a-secure-admin-password"}'
+$response = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/auth/login -ContentType 'application/json' -Body $loginBody
+$token = $response.access_token
+```
+
+#### 2. Get Current User Info (`GET /auth/me`)
+
+```powershell
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8000/auth/me -Headers $headers
+```
+
+#### 3. Initializing Admin User via CLI
+
+```powershell
+Set-Location C:\AI-SOC-RAG
+$env:ADMIN_USERNAME = "admin"
+$env:ADMIN_EMAIL = "admin@aisoc.local"
+$env:ADMIN_PASSWORD = "SuperSecretAdminPassword123!"
+.\.venv\Scripts\python.exe -m app.auth.init_admin
+```
+
+### Testing Instructions
+
+Run authentication unit and integration tests:
+
+```powershell
+python -m pytest tests/test_auth.py
+```
+
+Run full test suite (100 passed):
+
+```powershell
+python -m pytest -q
+```
+
 ## Prerequisites
 
 - Python 3.11 or later
@@ -716,3 +771,4 @@ Vite prints the local URL (normally http://localhost:5173). Open it in a browser
 .\.venv\Scripts\Activate.ps1
 python -m pytest tests
 ```
+

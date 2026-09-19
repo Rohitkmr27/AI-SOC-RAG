@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
   LayoutDashboard,
@@ -11,11 +11,17 @@ import {
   Clock,
   Terminal,
   Activity,
+  LogOut,
+  UserCheck,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export const RootLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
   const [checking, setChecking] = useState<boolean>(false);
@@ -39,6 +45,11 @@ export const RootLayout: React.FC = () => {
     const interval = setInterval(checkStatus, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   const navItems = [
     { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -119,7 +130,7 @@ export const RootLayout: React.FC = () => {
               {backendOnline === true ? 'ONLINE' : backendOnline === false ? 'OFFLINE' : 'CHECKING'}
             </span>
           </div>
-          <p className="text-[10px] text-slate-600">AI-SOC-RAG Stage 9.2 • Production</p>
+          <p className="text-[10px] text-slate-600">AI-SOC-RAG Stage 10 • Authenticated</p>
         </div>
       </aside>
 
@@ -136,8 +147,25 @@ export const RootLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Authenticated User Identity */}
+            {user && (
+              <div className="flex items-center space-x-2 text-xs font-mono bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800">
+                <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-slate-200 font-bold">{user.username}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                    user.role === 'ADMIN'
+                      ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                      : 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
+                  }`}
+                >
+                  {user.role}
+                </span>
+              </div>
+            )}
+
             {lastRefreshed && (
-              <div className="hidden md:flex items-center space-x-1.5 text-[11px] font-mono text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-800">
+              <div className="hidden xl:flex items-center space-x-1.5 text-[11px] font-mono text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-800">
                 <Clock className="w-3 h-3 text-slate-500" />
                 <span>Last refresh: {lastRefreshed}</span>
               </div>
@@ -150,6 +178,15 @@ export const RootLayout: React.FC = () => {
               className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button
+              onClick={handleLogout}
+              title="Sign Out"
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-mono text-xs rounded-lg border border-rose-500/30 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </header>

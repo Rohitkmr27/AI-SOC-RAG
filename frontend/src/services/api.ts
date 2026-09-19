@@ -9,11 +9,15 @@ import {
   HealthResponse,
   IncidentInvestigationResponse,
   IncidentResponse,
+  LoginRequest,
   RAGQueryRequest,
   RAGQueryResponse,
+  TokenResponse,
+  UserResponse,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const TOKEN_KEY = 'aisoc_token';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -23,7 +27,55 @@ export const apiClient = axios.create({
   timeout: 30000,
 });
 
+// Request Interceptor: Attach JWT Bearer Token if available
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response Interceptor: Handle HTTP 401 Unauthorized globally
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token and notify app to redirect to login
+      localStorage.removeItem(TOKEN_KEY);
+      window.dispatchEvent(new Event('aisoc_auth_expired'));
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const api = {
+  // Authentication & User Identity
+  async login(credentials: LoginRequest): Promise<TokenResponse> {
+    const response = await apiClient.post<TokenResponse>('/auth/login', credentials);
+    if (response.data.access_token) {
+      localStorage.setItem(TOKEN_KEY, response.data.access_token);
+    }
+    return response.data;
+  },
+
+  async getCurrentUser(): Promise<UserResponse> {
+    const response = await apiClient.get<UserResponse>('/auth/me');
+    return response.data;
+  },
+
+  logout(): void {
+    localStorage.removeItem(TOKEN_KEY);
+    window.dispatchEvent(new Event('aisoc_logout'));
+  },
+
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+  },
+
   // System Health
   async getHealth(): Promise<HealthResponse> {
     const response = await apiClient.get<HealthResponse>('/health');
