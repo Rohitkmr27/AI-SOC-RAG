@@ -100,7 +100,16 @@ def get_cors_allowed_origins() -> list[str]:
     env = get_app_env()
 
     if raw:
-        origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+        raw_origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+        origins = []
+        for item in raw_origins:
+            if item == "*":
+                origins.append("*")
+            elif not item.startswith("http://") and not item.startswith("https://"):
+                origins.append(f"https://{item}")
+                origins.append(f"http://{item}")
+            else:
+                origins.append(item)
     else:
         origins = []
 
@@ -115,6 +124,7 @@ def get_cors_allowed_origins() -> list[str]:
     if not origins:
         return DEFAULT_DEV_CORS_ORIGINS
     return origins
+
 
 
 def get_database_url() -> str | None:
