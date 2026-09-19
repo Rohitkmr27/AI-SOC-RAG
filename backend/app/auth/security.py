@@ -8,21 +8,14 @@ from typing import Any
 import jwt
 import bcrypt
 
-DEFAULT_JWT_SECRET = "ai-soc-rag-dev-jwt-secret-key-32bytesmin"
+from app.config import (
+    DEFAULT_DEV_JWT_SECRET as DEFAULT_JWT_SECRET,
+    get_jwt_secret_key,
+    get_token_expire_minutes,
+)
+
 ALGORITHM = "HS256"
 
-
-def get_jwt_secret_key() -> str:
-    """Retrieve the configured JWT secret key from environment or fallback default."""
-    return os.getenv("JWT_SECRET_KEY", DEFAULT_JWT_SECRET)
-
-
-def get_token_expire_minutes() -> int:
-    """Retrieve configured access token expiration minutes from environment."""
-    try:
-        return int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
-    except ValueError:
-        return 60
 
 
 def hash_password(password: str) -> str:

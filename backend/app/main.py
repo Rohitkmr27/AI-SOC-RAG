@@ -1,34 +1,57 @@
-"""FastAPI application entry point for the Stage 1 backend."""
-
 import logging
-import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.alerts.api import router as alerts_router
 from app.auth.api import router as auth_router
+from app.config import (
+    SensitiveDataFilter,
+    get_cors_allowed_origins,
+    get_log_level,
+    validate_production_configuration,
+)
 from app.ids.api import router as ids_router
 from app.rag.api import router as rag_router
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware adding standard security hardening HTTP headers to response headers."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
+
+
 def configure_logging() -> None:
-    """Configure application logging from the environment when needed."""
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    """Configure application logging with sensitive data masking."""
+    log_level = get_log_level()
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.addFilter(SensitiveDataFilter())
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    root_logger.handlers = [handler]
 
 
 configure_logging()
+validate_production_configuration()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI-SOC-RAG Backend", version="0.1.0")
 
-# Security Hardening: Environment-configurable CORS allowed origins
-raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
-allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Security Hardening: Environment-validated CORS allowed origins
+allowed_origins = get_cors_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,3 +72,4 @@ async def health_check() -> dict[str, str]:
     """Return a simple readiness confirmation for the backend service."""
     logger.debug("Health endpoint requested")
     return {"status": "ok", "service": "ai-soc-rag-backend"}
+

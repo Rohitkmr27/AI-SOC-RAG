@@ -9,6 +9,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
+from app.config import ConfigurationError, get_database_url
+
+
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
 
@@ -20,10 +23,15 @@ class DatabaseConfigurationError(RuntimeError):
 @lru_cache
 def get_engine():
     """Create a database engine only when database-backed functionality is used."""
-    database_url = os.getenv("DATABASE_URL")
+    try:
+        database_url = get_database_url()
+    except ConfigurationError as error:
+        raise DatabaseConfigurationError(str(error)) from error
+
     if not database_url:
         raise DatabaseConfigurationError("DATABASE_URL is not configured.")
     return create_engine(database_url, pool_pre_ping=True)
+
 
 
 def get_session_factory() -> sessionmaker[Session]:

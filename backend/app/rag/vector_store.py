@@ -1,5 +1,6 @@
-"""Persistent local Qdrant storage for security knowledge chunks."""
+"""Qdrant storage adapter supporting local and Qdrant Cloud deployments."""
 
+import os
 from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
@@ -9,7 +10,7 @@ from app.rag.schemas import DocumentChunk
 
 
 class QdrantStore:
-    """Small adapter around Qdrant's local persistent client."""
+    """Adapter around Qdrant supporting local persistence and Qdrant Cloud."""
 
     def __init__(
         self,
@@ -18,30 +19,53 @@ class QdrantStore:
     ) -> None:
         self.path = Path(path)
         self.collection_name = collection_name
-        self.path.mkdir(parents=True, exist_ok=True)
+
+        qdrant_url = os.getenv("QDRANT_URL")
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")
+
         try:
             from qdrant_client import QdrantClient
         except ImportError as error:
             raise RuntimeError(
-                "qdrant-client is required for vector storage. Install backend/requirements.txt first."
+                "qdrant-client is required for vector storage. "
+                "Install backend/requirements.txt first."
             ) from error
-        self.client = QdrantClient(path=str(self.path))
+
+        if qdrant_url:
+            # Cloud deployment
+            self.client = QdrantClient(
+                url=qdrant_url,
+                api_key=qdrant_api_key,
+            )
+        else:
+            # Local development
+            self.path.mkdir(parents=True, exist_ok=True)
+            self.client = QdrantClient(path=str(self.path))
 
     def recreate_collection(self, vector_size: int) -> None:
         from qdrant_client.models import Distance, VectorParams
 
         if self.client.collection_exists(self.collection_name):
             self.client.delete_collection(self.collection_name)
+
         self.client.create_collection(
             collection_name=self.collection_name,
-            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            vectors_config=VectorParams(
+                size=vector_size,
+                distance=Distance.COSINE,
+            ),
         )
 
-    def upsert(self, chunks: list[DocumentChunk], vectors: list[list[float]]) -> None:
+    def upsert(
+        self,
+        chunks: list[DocumentChunk],
+        vectors: list[list[float]],
+    ) -> None:
         from qdrant_client.models import PointStruct
 
         if len(chunks) != len(vectors):
             raise ValueError("Each chunk must have exactly one embedding.")
+
         points = [
             PointStruct(
                 id=str(uuid5(NAMESPACE_URL, chunk.chunk_id)),
@@ -60,8 +84,12 @@ class QdrantStore:
             )
             for chunk, vector in zip(chunks, vectors)
         ]
+
         if points:
-            self.client.upsert(collection_name=self.collection_name, points=points)
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points,
+            )
 
     def search(
         self,
@@ -71,6 +99,7 @@ class QdrantStore:
     ) -> list[Any]:
         if top_k <= 0:
             raise ValueError("top_k must be positive.")
+
         return self.client.query_points(
             collection_name=self.collection_name,
             query=vector,
