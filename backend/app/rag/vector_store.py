@@ -1,4 +1,4 @@
-"""Qdrant storage adapter supporting local and Qdrant Cloud deployments."""
+"""Persistent/local or Qdrant Cloud storage for security knowledge chunks."""
 
 import os
 from pathlib import Path
@@ -10,7 +10,7 @@ from app.rag.schemas import DocumentChunk
 
 
 class QdrantStore:
-    """Adapter around Qdrant supporting local persistence and Qdrant Cloud."""
+    """Adapter around Qdrant local persistent or cloud client."""
 
     def __init__(
         self,
@@ -20,9 +20,6 @@ class QdrantStore:
         self.path = Path(path)
         self.collection_name = collection_name
 
-        qdrant_url = os.getenv("QDRANT_URL")
-        qdrant_api_key = os.getenv("QDRANT_API_KEY")
-
         try:
             from qdrant_client import QdrantClient
         except ImportError as error:
@@ -31,11 +28,14 @@ class QdrantStore:
                 "Install backend/requirements.txt first."
             ) from error
 
+        qdrant_url = os.getenv("QDRANT_URL", "").strip()
+        qdrant_api_key = os.getenv("QDRANT_API_KEY", "").strip()
+
         if qdrant_url:
-            # Cloud deployment
+            # Qdrant Cloud
             self.client = QdrantClient(
                 url=qdrant_url,
-                api_key=qdrant_api_key,
+                api_key=qdrant_api_key or None,
             )
         else:
             # Local development
