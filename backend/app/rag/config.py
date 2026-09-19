@@ -14,3 +14,7 @@ DEFAULT_CHUNK_OVERLAP = 200
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_COLLECTION_NAME = "security_knowledge_chunks"
 SUPPORTED_SUFFIXES = {".txt", ".md", ".pdf"}
+DEFAULT_RAG_TOP_K = 5
+DEFAULT_RAG_SCORE_THRESHOLD: float | None = None
+DEFAULT_RAG_MAX_CONTEXT_CHARS = 12000
+DEFAULT_LLM_MODEL = "gemini-2.5-flash"

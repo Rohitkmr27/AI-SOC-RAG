@@ -172,6 +172,112 @@ python -m app.rag.index
 
 The generated `chunks.jsonl`, local Qdrant store, source manifest, downloaded documents, and MITRE parsed output are local derived data. They should not be blindly committed to Git, especially the large MITRE dataset or vector database. The downloader code, configuration, tests, and documentation are the tracked project artifacts.
 
+## Stage 5: RAG Answer Generation
+
+Stage 5 connects the Stage 4.2 semantic retrieval engine to an LLM to generate strictly grounded cybersecurity answers with preserved source citations.
+
+### Architecture
+
+```text
+User question
+    ↓
+Existing semantic search (Qdrant + all-MiniLM-L6-v2)
+    ↓
+Top-K relevant Qdrant chunks
+    ↓
+Bounded context construction
+    ↓
+LLM (Google Gemini via REST API)
+    ↓
+Grounded answer + source citations
+```
+
+### Environment Configuration
+
+Configure the Gemini API key in your environment or local `.env` file:
+
+```powershell
+$env:GEMINI_API_KEY = "your-api-key-here"
+# Optional model override (default: gemini-2.5-flash):
+$env:GEMINI_MODEL = "gemini-2.5-flash"
+```
+
+The system does not fail on import when `GEMINI_API_KEY` is omitted. If retrieval succeeds but the key is not set, the CLI displays the retrieved sources and informs the operator that generation requires `GEMINI_API_KEY`.
+
+### CLI Usage
+
+From the `backend` directory:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m app.rag.generate "What is a brute force attack?"
+```
+
+Supported options:
+
+```powershell
+python -m app.rag.generate "What is a brute force attack?" --top-k 3 --score-threshold 0.4 --json
+```
+
+- `--top-k`: Number of chunks to retrieve (default: 5).
+- `--score-threshold`: Optional similarity score cutoff.
+- `--max-context-chars`: Maximum context character budget (default: 12000).
+- `--model`: Gemini model override (defaults to `GEMINI_MODEL` or `gemini-2.5-flash`).
+- `--json`: Output full structured JSON response.
+
+### API Usage
+
+Start the backend:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\backend
+python -m uvicorn app.main:app --reload
+```
+
+Endpoint: `POST /rag/query`
+
+Example request:
+
+```json
+{
+  "query": "What is a brute force attack?",
+  "top_k": 3,
+  "score_threshold": 0.3
+}
+```
+
+Example response:
+
+```json
+{
+  "answer": "Based on the retrieved security knowledge, a brute force attack involves an adversary systematically guessing passwords using a repetitive or iterative mechanism. It can occur via service interaction or offline against obtained credential data.",
+  "sources": [
+    {
+      "source": "mitre/parsed/techniques-attack-pattern--a93494bb-4b80-4ea1-8695-3236a49916fd.md",
+      "file_name": "techniques-attack-pattern--a93494bb-4b80-4ea1-8695-3236a49916fd.md",
+      "document_id": "ff05859ed52021ae429ae330a872afbd5dccd9cdf2f59e723713826c6f0996cd",
+      "chunk_id": "669082063f09c83d997279ccd5133530f0fe7b48f30878da6be5606bf3b2855f",
+      "chunk_index": 2,
+      "score": 0.5168,
+      "title": null
+    }
+  ]
+}
+```
+
+### Hallucination Guard and Empty Retrieval
+
+- The system prompt strictly restricts answers to the supplied retrieved security knowledge.
+- If semantic retrieval finds no matching chunks (or all chunks fall below `--score-threshold`), the system returns:
+  `"I could not find sufficient information in the security knowledge base to answer this question."`
+  with an empty source list, without calling the LLM.
+
+### Limitations
+
+- Answers are strictly limited to the ingested official cybersecurity sources (MITRE ATT&CK, NIST CSF 2.0, OWASP Top 10, CISA CPG).
+- Live generation requires a valid `GEMINI_API_KEY` and internet access to the Google Gemini endpoint.
+- This stage provides direct question-answering only; it intentionally does not include multi-agent workflows, autonomous tool execution, alert correlation, or a frontend chat dashboard.
+
 ## Prerequisites
 
 - Python 3.11 or later

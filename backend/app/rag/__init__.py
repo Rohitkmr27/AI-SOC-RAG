@@ -1,1 +1,1 @@
-"""Document-ingestion foundation for the future RAG knowledge base."""
+"""RAG knowledge base ingestion, indexing, retrieval, and grounded answer generation."""
