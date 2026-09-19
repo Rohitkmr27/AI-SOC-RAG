@@ -53,10 +53,10 @@ OFFICIAL_SOURCES = (
     ),
     OfficialSource(
         name="CISA Cross-Sector Cybersecurity Performance Goals",
-        url="https://www.cisa.gov/sites/default/files/2023-08/cisa-cross-sector-cybersecurity-performance-goals.pdf",
-        relative_path="cisa/cisa-cpg.pdf",
-        source_type="PDF",
-        version="1.0",
+        url="https://raw.githubusercontent.com/cisagov/cybersecurity-performance-goals/develop/README.md",
+        relative_path="cisa/cisa-cpg.md",
+        source_type="Official CISA Markdown",
+        version="develop",
     ),
 )
 

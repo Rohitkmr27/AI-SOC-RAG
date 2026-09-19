@@ -42,6 +42,11 @@ def test_saved_model_loads_and_predicts(tmp_path: Path, sample_data: pd.DataFram
     assert result["prediction"] in {"BENIGN", "PortScan"}
     assert 0 <= result["confidence"] <= 1
 
+def test_prediction_strips_dataset_header_whitespace(sample_data: pd.DataFrame) -> None:
+    model = fitted_model(sample_data)
+    result = predict_flow(model, {" Flow Duration": 2, " Protocol": 6, " Service": "http"})
+    assert result["prediction"] in {"BENIGN", "PortScan"}
+
 def test_prediction_endpoint_success(monkeypatch, sample_data: pd.DataFrame) -> None:
     monkeypatch.setattr(api, "load_model", lambda _: fitted_model(sample_data))
     response = TestClient(app).post("/ids/predict", json={"features": {"Flow Duration": 2, "Protocol": 6, "Service": "http"}})

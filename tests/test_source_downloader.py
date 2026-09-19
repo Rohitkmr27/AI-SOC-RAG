@@ -39,7 +39,7 @@ def test_official_source_configuration_uses_expected_official_hosts() -> None:
     assert "raw.githubusercontent.com/mitre-attack/attack-stix-data" in OFFICIAL_SOURCES[0].url
     assert "nvlpubs.nist.gov" in OFFICIAL_SOURCES[1].url
     assert "owasp.org/Top10/2025" in OFFICIAL_SOURCES[2].url
-    assert "cisa.gov" in OFFICIAL_SOURCES[3].url
+    assert "raw.githubusercontent.com/cisagov/cybersecurity-performance-goals" in OFFICIAL_SOURCES[3].url
 
 
 def test_download_creates_directories_and_manifest_metadata(tmp_path: Path) -> None:

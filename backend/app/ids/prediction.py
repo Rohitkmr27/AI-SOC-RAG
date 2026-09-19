@@ -20,6 +20,7 @@ def severity_for_prediction(label: str, confidence: float) -> str:
 
 def predict_flow(model: Pipeline, flow_features: dict[str, Any]) -> dict[str, str | float]:
     features = pd.DataFrame([flow_features])
+    features.columns = features.columns.astype(str).str.strip()
     prediction = normalize_attack_label(str(model.predict(features)[0]))
     confidence = float(model.predict_proba(features).max()) if hasattr(model, "predict_proba") else 0.0
     return {"prediction": prediction, "confidence": round(confidence, 4), "severity": severity_for_prediction(prediction, confidence)}
