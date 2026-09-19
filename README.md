@@ -605,7 +605,58 @@ Run full test suite:
 python -m pytest -q
 ```
 
+## Stage 9: SOC Dashboard / Frontend Foundation
 
+Stage 9 implements a dark-themed Security Operations Center (SOC) dashboard built with React, Vite, TypeScript, and Tailwind CSS. It consumes all existing Stage 1–8 FastAPI backend endpoints.
+
+### Architecture
+
+```text
+React + Vite + TypeScript Frontend
+        │
+        ├─ Centralized Axios API Client (VITE_API_BASE_URL)
+        │
+        ├─ Core Layout (Dark SOC Theme + Global Health Status Indicator)
+        │
+        ├─ /dashboard (Overview Metrics Cards & Recharts Severity Breakdown)
+        ├─ /alerts & /alerts/:id (Alerts Table, Filtering, PATCH Status Controls, RAG Enrichment)
+        ├─ /incidents & /incidents/:id (Correlated Campaigns, Risk Score Gauges, AI Investigation UI)
+        ├─ /knowledge-base (Semantic RAG Search & Cited Sources Metadata)
+        └─ /system (Backend Readiness Telemetry via GET /health)
+```
+
+### Environment Configuration
+
+Configure the backend URL in `frontend/.env`:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+### Frontend Development & Build Commands
+
+Navigate to the `frontend` directory:
+
+```powershell
+Set-Location C:\AI-SOC-RAG\frontend
+```
+
+1. **Install Dependencies**:
+   ```powershell
+   npm install
+   ```
+
+2. **Run Local Development Server**:
+   ```powershell
+   npm run dev
+   ```
+   Open the Vite development server URL in your browser (typically `http://localhost:5173`).
+
+3. **Verify Production Build & Type Checking**:
+   ```powershell
+   npm run build
+   ```
+   This runs `tsc && vite build` and generates the production bundle under `frontend/dist/`.
 
 ## Prerequisites
 
