@@ -78,8 +78,17 @@ export const api = {
 
   // System Health
   async getHealth(): Promise<HealthResponse> {
-    const response = await apiClient.get<HealthResponse>('/health');
-    return response.data;
+    try {
+      const response = await apiClient.get<HealthResponse>('/api/v1/system-status');
+      return response.data;
+    } catch (err: any) {
+      // If blocked by adblock or /api/v1/system-status unavailable, attempt /health
+      if (err?.code === 'ERR_BLOCKED_BY_CLIENT') {
+        throw err;
+      }
+      const response = await apiClient.get<HealthResponse>('/health');
+      return response.data;
+    }
   },
 
   // Alert Management

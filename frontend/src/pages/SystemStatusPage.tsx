@@ -62,8 +62,8 @@ export const SystemStatusPage: React.FC = () => {
           <div className="flex items-center space-x-3">
             <Server className="w-6 h-6 text-cyan-400" />
             <div>
-              <h3 className="text-sm font-bold text-slate-100">FastAPI Backend Status (GET /health)</h3>
-              <p className="text-slate-400 text-[11px]">Endpoint: {apiBaseUrl}/health</p>
+              <h3 className="text-sm font-bold text-slate-100">FastAPI Backend Status (GET /api/v1/system-status)</h3>
+              <p className="text-slate-400 text-[11px]">Endpoint: {apiBaseUrl}/api/v1/system-status</p>
             </div>
           </div>
 

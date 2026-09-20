@@ -68,6 +68,9 @@ app.include_router(rag_router)
 
 
 @app.get("/health")
+@app.get("/api/health")
+@app.get("/api/v1/health")
+@app.get("/api/v1/system-status")
 async def health_check() -> dict[str, str]:
     """Return a simple readiness confirmation for the backend service."""
     logger.debug("Health endpoint requested")
