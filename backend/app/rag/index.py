@@ -1,8 +1,13 @@
-"""Index Stage 4 JSONL chunks into a local persistent Qdrant collection."""
+"""Index Stage 4 JSONL chunks into a local persistent or Qdrant Cloud collection."""
 
 import argparse
 import json
+import logging
 from pathlib import Path
+from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 from app.rag.config import (
     DEFAULT_COLLECTION_NAME,
@@ -35,17 +40,28 @@ def index_chunks(
     vector_store_path: Path = DEFAULT_VECTOR_STORE_DIRECTORY,
     collection_name: str = DEFAULT_COLLECTION_NAME,
     model_name: str = DEFAULT_EMBEDDING_MODEL,
+    batch_size: int = 100,
 ) -> tuple[int, int]:
     chunks = read_chunks(chunks_path)
+    logger.info("Loaded %d chunks from %s", len(chunks), chunks_path)
+
     embedder = EmbeddingService(model_name)
     store = QdrantStore(vector_store_path, collection_name)
     store.recreate_collection(embedder.dimension)
-    if chunks:
-        store.upsert(chunks, embedder.embed([chunk.text for chunk in chunks]))
-    return len(chunks), embedder.dimension
+
+    total_chunks = len(chunks)
+    if total_chunks > 0:
+        for i in range(0, total_chunks, batch_size):
+            batch = chunks[i : i + batch_size]
+            vectors = embedder.embed([chunk.text for chunk in batch])
+            store.upsert(batch, vectors)
+            logger.info("Indexed %d/%d chunks...", min(i + batch_size, total_chunks), total_chunks)
+
+    return total_chunks, embedder.dimension
 
 
 def main() -> None:
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Index local knowledge-base chunks in Qdrant.")
     parser.add_argument("--chunks", type=Path, default=DEFAULT_PROCESSED_DIRECTORY / "chunks.jsonl")
     parser.add_argument("--vector-store", type=Path, default=DEFAULT_VECTOR_STORE_DIRECTORY)
@@ -57,4 +73,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main()

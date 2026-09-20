@@ -36,6 +36,7 @@ class QdrantStore:
             self.client = QdrantClient(
                 url=qdrant_url,
                 api_key=qdrant_api_key or None,
+                timeout=60.0,
             )
         else:
             # Local development
