@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def init_admin() -> None:
     """Create or update the initial administrative user using environment variables."""
     username = os.getenv("ADMIN_USERNAME", "admin").strip()
-    email = os.getenv("ADMIN_EMAIL", "admin@aisoc.local").strip()
+    email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     password = os.getenv("ADMIN_PASSWORD", "admin123").strip()
 
     if not username or not email or not password:
@@ -43,7 +43,8 @@ def init_admin() -> None:
         ).scalar_one_or_none()
 
         if user:
-            logger.info("Admin user '%s' (%s) already exists. Updating password hash and role...", user.username, user.email)
+            logger.info("Admin user '%s' (%s) already exists. Updating email, password hash, and role...", user.username, user.email)
+            user.email = email
             user.password_hash = hash_password(password)
             user.role = UserRole.ADMIN
             user.is_active = True

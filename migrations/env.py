@@ -6,7 +6,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.alerts import models  # noqa: F401 - register model metadata
+from app.alerts import models as alert_models  # noqa: F401 - register model metadata
+from app.auth import models as auth_models  # noqa: F401 - register model metadata
 from app.database import Base
 
 config = context.config

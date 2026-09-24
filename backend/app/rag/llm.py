@@ -42,8 +42,6 @@ class GeminiProvider(LLMProvider):
                 "Please configure GEMINI_API_KEY to generate answers with Google Gemini."
             )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
-
         contents: list[dict[str, Any]] = [
             {
                 "role": "user",
@@ -64,27 +62,61 @@ class GeminiProvider(LLMProvider):
             }
 
         data = json.dumps(payload).encode("utf-8")
-        # Google recommends passing the key in the x-goog-api-key header for security
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key.strip(),
         }
 
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        fallback_models = [self.model_name]
+        for candidate in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+            if candidate not in fallback_models:
+                fallback_models.append(candidate)
 
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as response:
-                response_text = response.read().decode("utf-8")
-                response_data = json.loads(response_text)
-        except urllib.error.HTTPError as error:
-            error_body = error.read().decode("utf-8", errors="replace")
-            logger.error("Gemini API error (HTTP %d): %s", error.code, error.reason)
-            raise RuntimeError(
-                f"Gemini API request failed with HTTP {error.code}: {error.reason}."
-            ) from error
-        except urllib.error.URLError as error:
-            logger.error("Gemini network error: %s", error.reason)
-            raise RuntimeError(f"Network error connecting to Gemini API: {error.reason}") from error
+        import time
+
+        last_error = None
+        response_data = None
+
+        for model in fallback_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            max_attempts = 2
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+                    with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                        response_text = response.read().decode("utf-8")
+                        response_data = json.loads(response_text)
+                        break
+                except urllib.error.HTTPError as error:
+                    last_error = error
+                    if error.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
+                        logger.warning("Gemini API (%s) HTTP %d error (attempt %d/%d). Retrying in 1s...", model, error.code, attempt, max_attempts)
+                        time.sleep(1.0 * attempt)
+                        continue
+                    if error.code in (404, 429, 500, 502, 503, 504):
+                        logger.warning("Gemini API (%s) HTTP %d (%s). Trying fallback model...", model, error.code, error.reason)
+                        time.sleep(0.5)
+                        break
+                    error_body = error.read().decode("utf-8", errors="replace")
+                    logger.error("Gemini API error (HTTP %d): %s", error.code, error.reason)
+                    raise RuntimeError(
+                        f"Gemini API request failed with HTTP {error.code}: {error.reason}."
+                    ) from error
+                except (urllib.error.URLError, TimeoutError, OSError) as error:
+                    last_error = error
+                    if attempt < max_attempts:
+                        logger.warning("Gemini network error (%s) (attempt %d/%d). Retrying...", model, attempt, max_attempts)
+                        time.sleep(0.5 * attempt)
+                        continue
+                    break
+
+            if response_data is not None:
+                break
+
+        if response_data is None:
+            reason = getattr(last_error, "reason", str(last_error))
+            code = getattr(last_error, "code", "network_error")
+            raise RuntimeError(f"Gemini API request failed with HTTP {code}: {reason}.")
 
         try:
             candidates = response_data.get("candidates", [])
