@@ -1,10 +1,11 @@
-"""FastAPI endpoints for persisted security alerts."""
-
+import io
 import logging
 import uuid
+from collections import Counter
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -15,12 +16,14 @@ from app.alerts.schemas import (
     AlertResponse,
     AlertUpdate,
     CorrelationResponse,
+    CsvAlertResponse,
     IdsAlertCreate,
     IncidentInvestigationResponse,
     IncidentResponse,
 )
 from app.alerts.service import (
     create_alert,
+    create_alerts_from_predictions,
     get_alert,
     list_alerts,
     list_recent_alerts,
@@ -34,9 +37,16 @@ from app.rag.incident_investigation import investigate_incident
 from app.rag.llm import LLMProvider
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
-from app.ids.config import DEFAULT_ARTIFACT_DIRECTORY, MODEL_FILENAME
+from app.ids.api import _extract_csv_payload
+from app.ids.config import (
+    DEFAULT_ARTIFACT_DIRECTORY,
+    MAX_DETECTION_FILE_SIZE_MB,
+    MAX_DETECTION_RESPONSE_RESULTS,
+    MAX_DETECTION_ROWS,
+    MODEL_FILENAME,
+)
 from app.ids.model import load_model
-from app.ids.prediction import predict_flow
+from app.ids.prediction import predict_flow, predict_flows
 
 
 logger = logging.getLogger(__name__)
@@ -108,6 +118,115 @@ def create_alert_from_ids(payload: IdsAlertCreate, session: Session = Depends(ge
         return create_alert(session, alert_payload)
     except SQLAlchemyError as error:
         raise database_error(session, error) from error
+
+
+@router.post("/from-csv", response_model=CsvAlertResponse, status_code=201)
+async def create_alerts_from_csv(
+    request: Request,
+    session: Session = Depends(get_db),
+) -> CsvAlertResponse:
+    """Run batch IDS prediction on an uploaded CSV file and persist detected attack flows as alerts.
+    
+    Normal (BENIGN) flows are ignored.
+    Attack flows are converted to Alert database records and persisted.
+    Deduplicates against existing database alert records.
+    """
+    content_type = request.headers.get("content-type", "").lower()
+
+    try:
+        raw_body = await request.body()
+    except Exception as exc:
+        logger.error("Failed to read uploaded request body: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not read uploaded file content."
+        ) from exc
+
+    if not raw_body or len(raw_body.strip()) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded CSV file is empty."
+        )
+
+    max_bytes = MAX_DETECTION_FILE_SIZE_MB * 1024 * 1024
+    if len(raw_body) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File size exceeds maximum allowed limit of {MAX_DETECTION_FILE_SIZE_MB}MB."
+        )
+
+    csv_bytes = _extract_csv_payload(raw_body, content_type)
+
+    if not csv_bytes or len(csv_bytes.strip()) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded CSV file is empty."
+        )
+
+    try:
+        df = pd.read_csv(io.BytesIO(csv_bytes))
+    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError, ValueError) as exc:
+        logger.warning("Invalid CSV format uploaded: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is not a valid or readable CSV."
+        ) from exc
+
+    if df.empty or len(df) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded CSV contains no data rows."
+        )
+
+    if len(df) > MAX_DETECTION_ROWS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"CSV row count ({len(df)}) exceeds maximum allowed limit of {MAX_DETECTION_ROWS} rows."
+        )
+
+    try:
+        model = load_model(DEFAULT_ARTIFACT_DIRECTORY / MODEL_FILENAME)
+    except FileNotFoundError as exc:
+        logger.error("IDS model artifact missing: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Trained IDS model is unavailable."
+        ) from exc
+
+    try:
+        batch_results = predict_flows(df, model=model)
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.info("CSV batch prediction feature schema mismatch: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="CSV feature columns do not match the model's expected training schema."
+        ) from exc
+
+    try:
+        new_alerts, duplicates_skipped = create_alerts_from_predictions(session, batch_results, df)
+    except SQLAlchemyError as error:
+        raise database_error(session, error) from error
+
+    total_flows = len(batch_results)
+    normal_flows = sum(1 for r in batch_results if r["prediction"] == "BENIGN")
+    attack_flows = total_flows - normal_flows
+
+    attack_types = dict(Counter(r["prediction"] for r in batch_results if r["prediction"] != "BENIGN"))
+    severity_counts = dict(Counter(r["severity"] for r in batch_results if r["prediction"] != "BENIGN"))
+
+    created_ids = [a.id for a in new_alerts[:MAX_DETECTION_RESPONSE_RESULTS]]
+
+    return CsvAlertResponse(
+        total_flows=total_flows,
+        normal_flows=normal_flows,
+        attack_flows=attack_flows,
+        alerts_created=len(new_alerts),
+        duplicates_skipped=duplicates_skipped,
+        attack_types=attack_types,
+        severity_counts=severity_counts,
+        alert_ids=created_ids,
+    )
+
 
 
 @router.get("/correlations", response_model=CorrelationResponse)

@@ -17,3 +17,9 @@ SEVERITY_BY_LABEL = {
     "PortScan": "Medium", "SSH-Patator": "High", "Web Attack - Brute Force": "High",
     "Web Attack - Sql Injection": "Critical", "Web Attack - XSS": "High",
 }
+
+# Detection limits and safety controls
+MAX_DETECTION_FILE_SIZE_MB = 10
+MAX_DETECTION_ROWS = 10000
+MAX_DETECTION_RESPONSE_RESULTS = 100
+

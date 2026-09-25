@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Shield, Network, Cpu, Workflow, BookOpen } from 'lucide-react';
+import {
+  ArrowLeft,
+  Sparkles,
+  Shield,
+  Network,
+  Cpu,
+  Workflow,
+  BookOpen,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle2,
+  ListChecks,
+  ShieldAlert,
+} from 'lucide-react';
 import { api } from '../services/api';
 import { AlertEnrichmentResponse, AlertResponse, AlertSeverity, AlertStatus } from '../types';
 import { formatApiError } from '../utils/error';
@@ -79,7 +92,9 @@ export const AlertDetailPage: React.FC = () => {
       const res = await api.enrichAlert(id);
       setEnrichment(res);
     } catch (err: unknown) {
-      setEnrichError(formatApiError(err, 'Alert RAG enrichment service unavailable.'));
+      setEnrichError(
+        formatApiError(err, 'AI enrichment is temporarily unavailable. The original alert record remains fully operational.')
+      );
     } finally {
       setEnriching(false);
     }
@@ -88,7 +103,7 @@ export const AlertDetailPage: React.FC = () => {
   if (loading) {
     return (
       <div className="py-20 text-center text-slate-400 text-xs font-mono">
-        Loading alert metadata from PostgreSQL backend...
+        Loading alert metadata from SQL database...
       </div>
     );
   }
@@ -106,7 +121,7 @@ export const AlertDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Navigation Breadcrumb */}
       <div className="flex items-center justify-between font-mono text-xs">
         <button
@@ -148,10 +163,23 @@ export const AlertDetailPage: React.FC = () => {
           <button
             onClick={handleEnrichAlert}
             disabled={enriching}
-            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold font-mono text-xs rounded-lg shadow-lg transition disabled:opacity-50"
+            className={`flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl font-mono text-xs font-bold transition-all shadow-lg ${
+              enriching
+                ? 'bg-purple-950/50 text-purple-300 border border-purple-500/30 cursor-not-allowed'
+                : 'bg-purple-600 hover:bg-purple-500 text-white border border-purple-400 shadow-purple-500/20 active:scale-95'
+            }`}
           >
-            <Sparkles className={`w-4 h-4 ${enriching ? 'animate-spin' : ''}`} />
-            <span>{enriching ? 'Synthesizing RAG Enrichment...' : 'Enrich with AI'}</span>
+            {enriching ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-purple-300" />
+                <span>Retrieving Knowledge & Generating AI Analysis...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-purple-300 fill-current" />
+                <span>AI Enrich Alert</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -263,83 +291,165 @@ export const AlertDetailPage: React.FC = () => {
         </form>
       </div>
 
-      {/* Section 5: AI ENRICHMENT OUTPUT */}
-      {enrichError && <ErrorBanner message={enrichError} />}
-
-      {enrichment && (
-        <div className="soc-card p-6 border border-purple-500/30 bg-purple-950/10 space-y-5">
-          <div className="flex items-center space-x-2 border-b border-purple-500/20 pb-3">
-            <Sparkles className="w-5 h-5 text-purple-400" />
-            <h3 className="text-sm font-bold text-purple-200 font-mono">Grounded RAG Security Enrichment</h3>
+      {/* Section 5: AI ENRICHMENT ERROR BANNER */}
+      {enrichError && (
+        <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-xl flex items-start justify-between space-x-3 text-xs font-mono text-rose-300">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">AI Enrichment Unavailable</p>
+              <p className="text-rose-200/80">{enrichError}</p>
+            </div>
           </div>
 
-          <div className="space-y-4 text-xs font-mono">
-            <div>
-              <h4 className="text-purple-300 font-bold uppercase mb-1">Executive Analyst Summary</h4>
-              <p className="text-slate-200 leading-relaxed bg-slate-900/80 p-3.5 rounded border border-slate-800">
+          <button
+            onClick={handleEnrichAlert}
+            disabled={enriching}
+            className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded border border-rose-500/40 text-[11px] font-bold transition flex-shrink-0"
+          >
+            Retry AI Enrichment
+          </button>
+        </div>
+      )}
+
+      {/* Section 6: STRUCTURED RAG AI ANALYSIS OUTPUT */}
+      {enrichment && (
+        <div className="soc-card p-6 border border-purple-500/40 bg-purple-950/10 space-y-6 font-mono shadow-2xl">
+          {/* Section Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-500/20 pb-4">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 bg-purple-500/20 rounded-lg text-purple-300 border border-purple-500/30">
+                <Sparkles className="w-5 h-5 fill-current" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-100">AI Security Analysis</h3>
+                <p className="text-[11px] text-purple-300/80">Grounded in retrieved cybersecurity knowledge (SQLite FTS5 + Gemini)</p>
+              </div>
+            </div>
+
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 w-fit">
+              Analyst Decision Support
+            </span>
+          </div>
+
+          <div className="space-y-5 text-xs">
+            {/* Executive Summary */}
+            <div className="space-y-1.5">
+              <h4 className="text-purple-300 font-bold uppercase tracking-wider flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                <span>Executive Analyst Summary</span>
+              </h4>
+              <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800 text-slate-200 leading-relaxed text-xs">
                 {enrichment.analysis.summary}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-purple-300 font-bold uppercase mb-1">Observed Indicators</h4>
-                <ul className="list-disc list-inside space-y-1 bg-slate-900/80 p-3.5 rounded border border-slate-800 text-slate-300">
-                  {enrichment.analysis.observed_indicators.map((ind, i) => (
-                    <li key={i}>{ind}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-purple-300 font-bold uppercase mb-1">Security Context (MITRE ATT&CK / NIST)</h4>
-                <ul className="list-disc list-inside space-y-1 bg-slate-900/80 p-3.5 rounded border border-slate-800 text-slate-300">
-                  {enrichment.analysis.security_context.map((ctx, i) => (
-                    <li key={i}>{ctx}</li>
-                  ))}
-                </ul>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-purple-300 font-bold uppercase mb-1">Recommended Investigation Steps</h4>
-                <ul className="list-disc list-inside space-y-1 bg-slate-900/80 p-3.5 rounded border border-slate-800 text-slate-300">
-                  {enrichment.analysis.investigation_steps.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ul>
+            {/* Observed Indicators & Security Context Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Observed Indicators */}
+              <div className="space-y-1.5">
+                <h4 className="text-purple-300 font-bold uppercase tracking-wider flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 text-purple-400" />
+                  <span>Observed Indicators</span>
+                </h4>
+                <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800">
+                  <ul className="space-y-1.5 text-slate-300">
+                    {enrichment.analysis.observed_indicators.map((ind, i) => (
+                      <li key={i} className="flex items-start space-x-2">
+                        <span className="text-purple-400 font-bold">•</span>
+                        <span>{ind}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
-              <div>
-                <h4 className="text-purple-300 font-bold uppercase mb-1">Recommended Mitigations</h4>
-                <ul className="list-disc list-inside space-y-1 bg-slate-900/80 p-3.5 rounded border border-slate-800 text-slate-300">
-                  {enrichment.analysis.recommended_mitigations.map((mit, i) => (
-                    <li key={i}>{mit}</li>
-                  ))}
-                </ul>
+              {/* Security Context */}
+              <div className="space-y-1.5">
+                <h4 className="text-purple-300 font-bold uppercase tracking-wider flex items-center space-x-2">
+                  <BookOpen className="w-4 h-4 text-purple-400" />
+                  <span>Security Context (MITRE ATT&CK / NIST)</span>
+                </h4>
+                <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800">
+                  <ul className="space-y-1.5 text-slate-300">
+                    {enrichment.analysis.security_context.length === 0 ? (
+                      <li className="text-slate-500 italic">No specific framework tags mapped.</li>
+                    ) : (
+                      enrichment.analysis.security_context.map((ctx, i) => (
+                        <li key={i} className="flex items-start space-x-2">
+                          <span className="text-purple-400 font-bold">•</span>
+                          <span>{ctx}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
               </div>
             </div>
 
-            {/* Retrieved Knowledge Base Sources */}
-            <div className="pt-2">
-              <div className="flex items-center space-x-2 text-purple-300 font-bold uppercase mb-2">
-                <BookOpen className="w-4 h-4" />
-                <span>Cited Knowledge Base Sources ({enrichment.sources.length})</span>
+            {/* Investigation Steps & Recommended Mitigations Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Investigation Steps */}
+              <div className="space-y-1.5">
+                <h4 className="text-purple-300 font-bold uppercase tracking-wider flex items-center space-x-2">
+                  <ListChecks className="w-4 h-4 text-purple-400" />
+                  <span>Recommended Investigation Steps</span>
+                </h4>
+                <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800">
+                  <ol className="space-y-2 text-slate-300">
+                    {enrichment.analysis.investigation_steps.map((step, i) => (
+                      <li key={i} className="flex items-start space-x-2">
+                        <span className="text-cyan-400 font-bold">{i + 1}.</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </div>
+
+              {/* Recommended Mitigations */}
+              <div className="space-y-1.5">
+                <h4 className="text-purple-300 font-bold uppercase tracking-wider flex items-center space-x-2">
+                  <Shield className="w-4 h-4 text-purple-400" />
+                  <span>Recommended Containment & Mitigations</span>
+                </h4>
+                <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800">
+                  <ul className="space-y-1.5 text-slate-300">
+                    {enrichment.analysis.recommended_mitigations.map((mit, i) => (
+                      <li key={i} className="flex items-start space-x-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span>{mit}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Cited Knowledge Base Sources */}
+            <div className="space-y-2 pt-2 border-t border-purple-500/20">
+              <div className="flex items-center space-x-2 text-purple-300 font-bold uppercase">
+                <BookOpen className="w-4 h-4 text-purple-400" />
+                <span>Cited Cybersecurity Knowledge Sources ({enrichment.sources.length})</span>
+              </div>
+
               <div className="space-y-2">
-                {enrichment.sources.map((src, i) => (
-                  <div key={i} className="p-3 bg-slate-900/90 rounded border border-slate-800 flex items-center justify-between text-[11px]">
-                    <div>
-                      <p className="text-slate-200 font-bold">{src.title || src.file_name}</p>
-                      <p className="text-slate-500 font-mono">Source Path: {src.source}</p>
-                      <p className="text-slate-500 text-[10px]">Document ID: {src.document_id} • Chunk #{src.chunk_index}</p>
+                {enrichment.sources.length === 0 ? (
+                  <p className="text-slate-500 text-xs italic">No specific sources cited for this response.</p>
+                ) : (
+                  enrichment.sources.map((src, i) => (
+                    <div key={i} className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                      <div>
+                        <p className="text-slate-100 font-bold">{src.title || src.file_name}</p>
+                        <p className="text-slate-400 font-mono text-[10px]">Source Reference: {src.source}</p>
+                        <p className="text-slate-500 text-[10px]">Document ID: {src.document_id} • Chunk #{src.chunk_index}</p>
+                      </div>
+                      <span className="px-2.5 py-1 bg-purple-500/15 text-purple-300 rounded-lg border border-purple-500/30 font-mono font-bold w-fit">
+                        {(src.score * 100).toFixed(1)}% Relevance
+                      </span>
                     </div>
-                    <span className="px-2.5 py-1 bg-purple-500/10 text-purple-400 rounded border border-purple-500/20 font-mono font-bold">
-                      {(src.score * 100).toFixed(1)}% Match
-                    </span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -348,3 +458,5 @@ export const AlertDetailPage: React.FC = () => {
     </div>
   );
 };
+
+export default AlertDetailPage;

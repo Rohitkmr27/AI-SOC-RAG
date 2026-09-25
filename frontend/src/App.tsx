@@ -11,6 +11,7 @@ import { IncidentsPage } from './pages/IncidentsPage';
 import { IncidentDetailPage } from './pages/IncidentDetailPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { SystemStatusPage } from './pages/SystemStatusPage';
+import { DetectionPage } from './pages/DetectionPage';
 
 export const App: React.FC = () => {
   return (
@@ -29,6 +30,7 @@ export const App: React.FC = () => {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<OverviewPage />} />
+            <Route path="detection" element={<DetectionPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="alerts/:id" element={<AlertDetailPage />} />
             <Route path="incidents" element={<IncidentsPage />} />

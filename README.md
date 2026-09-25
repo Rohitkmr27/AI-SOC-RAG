@@ -63,6 +63,8 @@ Alert APIs:
 - `GET /alerts/{alert_id}` — retrieve an alert.
 - `PATCH /alerts/{alert_id}` — update only status, severity, or description.
 - `POST /alerts/from-ids` — run the existing trained IDS on supplied flow features and save that real prediction as an alert.
+- `POST /alerts/from-csv` — run batch IDS detection on an uploaded CSV file, ignore normal flows, and persist detected attack flows as deduplicated SQL Alert records.
+
 
 Example alert request:
 
@@ -101,11 +103,45 @@ python -m app.rag.document_loader --chunk-size 800 --chunk-overlap 150
 
 Do not add fabricated threat intelligence, secrets, or malware samples. Only add documents you are permitted to use; raw documents and generated chunks remain untracked.
 
-After training, send a prediction request using feature names from the downloaded CSV:
+After training, send a single prediction request or submit a CSV flow file for batch detection:
+
+Single flow prediction:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/ids/predict -ContentType 'application/json' -Body '{"features":{"Destination Port":80,"Flow Duration":12345,"Total Fwd Packets":5,"Total Backward Packets":4}}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/ids/predict -Headers @{ Authorization = "Bearer <token>" } -ContentType 'application/json' -Body '{"features":{"Destination Port":80,"Flow Duration":12345,"Total Fwd Packets":5,"Total Backward Packets":4}}'
 ```
+
+Batch CSV detection (`POST /ids/detect-csv`):
+
+```powershell
+# Upload a CSV file containing flow features for memory-safe batch prediction:
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/ids/detect-csv -Headers @{ Authorization = "Bearer <token>" } -InFile "C:\AI-SOC-RAG\data\raw\cicids2017\MachineLearningCVE\Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv" -ContentType "text/csv"
+```
+
+Example response:
+
+```json
+{
+  "total_flows": 50,
+  "normal_flows": 0,
+  "anomalies": 50,
+  "attack_types": {
+    "DDoS": 50
+  },
+  "severity_counts": {
+    "High": 50
+  },
+  "results": [
+    {
+      "row_index": 0,
+      "prediction": "DDoS",
+      "confidence": 1.0,
+      "severity": "High"
+    }
+  ]
+}
+```
+
 
 Stage 4 does not modify IDS, machine learning, alert, PostgreSQL, or API functionality, and does not add generation, an LLM, agents, threat intelligence, or a dashboard.
 

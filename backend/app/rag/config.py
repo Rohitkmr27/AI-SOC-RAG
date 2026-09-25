@@ -8,6 +8,7 @@ KNOWLEDGE_BASE_DIRECTORY = PROJECT_ROOT / "data" / "knowledge_base"
 DEFAULT_RAW_DIRECTORY = PROJECT_ROOT / "data" / "knowledge_base" / "raw"
 DEFAULT_PROCESSED_DIRECTORY = PROJECT_ROOT / "data" / "knowledge_base" / "processed"
 DEFAULT_VECTOR_STORE_DIRECTORY = PROJECT_ROOT / "data" / "knowledge_base" / "vector_store"
+DEFAULT_FTS_DATABASE_PATH = KNOWLEDGE_BASE_DIRECTORY / "knowledge_fts.db"
 DEFAULT_SOURCE_MANIFEST = KNOWLEDGE_BASE_DIRECTORY / "source_manifest.json"
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
   LayoutDashboard,
+  UploadCloud,
   Bell,
   Radio,
   BookOpen,
@@ -53,6 +54,7 @@ export const RootLayout: React.FC = () => {
 
   const navItems = [
     { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+    { path: '/detection', label: 'Detection Center', icon: UploadCloud },
     { path: '/alerts', label: 'Alerts', icon: Bell },
     { path: '/incidents', label: 'Incidents', icon: Radio },
     { path: '/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
@@ -61,6 +63,7 @@ export const RootLayout: React.FC = () => {
 
   const getPageTitle = () => {
     if (location.pathname.startsWith('/dashboard')) return 'Executive Security Overview';
+    if (location.pathname.startsWith('/detection')) return 'IDS Flow Detection Center';
     if (location.pathname.startsWith('/alerts')) return 'Security Alert Directory';
     if (location.pathname.startsWith('/incidents')) return 'Correlated Incident Campaigns';
     if (location.pathname.startsWith('/knowledge-base')) return 'Cyber Threat Knowledge Search';

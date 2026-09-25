@@ -6,6 +6,7 @@ import {
   AlertStatus,
   AlertUpdate,
   CorrelationResponse,
+  CsvAlertResponse,
   HealthResponse,
   IncidentInvestigationResponse,
   IncidentResponse,
@@ -157,4 +158,17 @@ export const api = {
     const response = await apiClient.post<RAGQueryResponse>('/rag/query', payload);
     return response.data;
   },
+
+  // IDS Batch Flow Detection & Alert Persistence
+  async uploadCsvForAlerts(file: File): Promise<CsvAlertResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<CsvAlertResponse>('/alerts/from-csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
+

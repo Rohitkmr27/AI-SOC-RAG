@@ -64,6 +64,19 @@ class IdsAlertCreate(BaseModel):
     features: dict[str, object] = Field(min_length=1)
 
 
+class CsvAlertResponse(BaseModel):
+    """Structured response summarizing CSV batch detection and alert persistence."""
+    total_flows: int = Field(ge=0)
+    normal_flows: int = Field(ge=0)
+    attack_flows: int = Field(ge=0)
+    alerts_created: int = Field(ge=0)
+    duplicates_skipped: int = Field(ge=0)
+    attack_types: dict[str, int] = Field(default_factory=dict)
+    severity_counts: dict[str, int] = Field(default_factory=dict)
+    alert_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+
 class AlertAnalysis(BaseModel):
     """Structured security analysis generated from retrieved cybersecurity knowledge."""
     summary: str

@@ -150,3 +150,15 @@ export interface IdsPredictionResponse {
   confidence: number;
   severity: AlertSeverity;
 }
+
+export interface CsvAlertResponse {
+  total_flows: number;
+  normal_flows: number;
+  attack_flows: number;
+  alerts_created: number;
+  duplicates_skipped: number;
+  attack_types: Record<string, number>;
+  severity_counts: Record<string, number>;
+  alert_ids: string[];
+}
+

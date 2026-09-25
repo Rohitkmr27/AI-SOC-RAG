@@ -96,30 +96,34 @@ def test_indexing_preserves_payload_and_reports_dimension(tmp_path: Path, monkey
     assert captured["vectors"] == [[27.0, 1.0, 0.0]]
 
 
-def test_similarity_search_returns_scores_and_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    class FakeStore:
-        def __init__(self, path, collection_name):
-            pass
-
-        def search(self, vector, top_k, score_threshold):
-            assert vector == [27.0, 1.0, 0.0]
-            assert (top_k, score_threshold) == (2, 0.7)
-            return [SimpleNamespace(score=0.91, payload={"content": "brute force", "chunk_id": "a" * 64})]
-
-    monkeypatch.setattr("app.rag.search.EmbeddingService", lambda model: EmbeddingService(model))
-    monkeypatch.setattr("app.rag.search.QdrantStore", FakeStore)
-    service = EmbeddingService("local-test-model")
-    service._model = FakeModel()
-    monkeypatch.setattr("app.rag.search.EmbeddingService", lambda model: service)
-
-    results = search_chunks("brute force attack guidance", 2, 0.7, tmp_path / "vectors")
-
-    assert results == [{"score": 0.91, "content": "brute force", "chunk_id": "a" * 64}]
-
-
 def test_similarity_search_rejects_invalid_query(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="non-empty"):
-        search_chunks("", vector_store_path=tmp_path / "vectors")
+        search_chunks("", db_path=tmp_path / "missing_fts.db")
+
+
+def test_fts_missing_database_handled_gracefully(tmp_path: Path) -> None:
+    results = search_chunks("DDoS attack mitigation", db_path=tmp_path / "nonexistent.db")
+    assert results == []
+
+
+def test_fts_index_builder_and_retrieval(tmp_path: Path) -> None:
+    chunks_path = tmp_path / "chunks.jsonl"
+    chunk = make_chunk(text="DDoS TCP SYN flood mitigation guidance")
+    chunks_path.write_text(chunk.model_dump_json() + "\n", encoding="utf-8")
+
+    db_path = tmp_path / "knowledge_fts.db"
+    from scripts.build_knowledge_index import build_fts_index
+
+    read, indexed, skipped, size_mb = build_fts_index(chunks_path, db_path)
+    assert (read, indexed, skipped) == (1, 1, 0)
+    assert db_path.exists()
+
+    results = search_chunks("DDoS SYN flood", top_k=5, db_path=db_path)
+    assert len(results) == 1
+    assert results[0]["chunk_id"] == chunk.chunk_id
+    assert results[0]["content"] == "DDoS TCP SYN flood mitigation guidance"
+    assert results[0]["title"] == "Security Guide"
+    assert results[0]["score"] > 0.0
 
 
 def test_qdrant_local_store_searches_payload(tmp_path: Path) -> None:
@@ -133,4 +137,4 @@ def test_qdrant_local_store_searches_payload(tmp_path: Path) -> None:
     assert len(points) == 1
     assert points[0].score == pytest.approx(1.0)
     assert points[0].payload["content"] == "brute force attack guidance"
-    assert points[0].payload["title"] == "Security Guide"
+    assert points[0].payload["title"] == "Security Guide"
