@@ -95,6 +95,20 @@ export const OverviewPage: React.FC = () => {
     count,
   }));
 
+  const [seeding, setSeeding] = useState<boolean>(false);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      await api.seedAlerts();
+      await fetchData();
+    } catch (err: unknown) {
+      setError(formatApiError(err, 'Failed to seed sample telemetry into database.'));
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Toolbar */}
@@ -103,14 +117,26 @@ export const OverviewPage: React.FC = () => {
           <h2 className="text-base font-bold text-slate-100 font-mono">SOC Threat Intelligence Overview</h2>
           <p className="text-xs text-slate-400 font-mono">Real-time metrics derived strictly from PostgreSQL & FastAPI backend</p>
         </div>
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="flex items-center space-x-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold rounded-lg border border-slate-700 transition disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh Metrics</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          {totalAlerts === 0 && !loading && (
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="flex items-center space-x-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-semibold rounded-lg border border-indigo-500 shadow-md shadow-indigo-950/50 transition disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${seeding ? 'animate-spin' : ''}`} />
+              <span>{seeding ? 'Seeding Data...' : 'Seed Sample Telemetry'}</span>
+            </button>
+          )}
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center space-x-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold rounded-lg border border-slate-700 transition disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh Metrics</span>
+          </button>
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} onRetry={fetchData} />}

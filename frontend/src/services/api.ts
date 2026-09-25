@@ -101,6 +101,11 @@ export const api = {
     return response.data;
   },
 
+  async seedAlerts(): Promise<AlertResponse[]> {
+    const response = await apiClient.post<AlertResponse[]>('/alerts/seed');
+    return response.data;
+  },
+
   async getAlert(alertId: string): Promise<AlertResponse> {
     const response = await apiClient.get<AlertResponse>(`/alerts/${alertId}`);
     return response.data;

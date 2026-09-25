@@ -70,6 +70,16 @@ def get_alerts(
         raise database_error(session, error) from error
 
 
+@router.post("/seed", response_model=list[AlertResponse], status_code=201)
+def seed_alerts_endpoint(session: Session = Depends(get_db)) -> Sequence[AlertResponse]:
+    """Seed sample security alerts into PostgreSQL database for dashboard telemetry."""
+    from app.alerts.seed import seed_alerts
+    try:
+        return seed_alerts(session)
+    except SQLAlchemyError as error:
+        raise database_error(session, error) from error
+
+
 @router.post("/from-ids", response_model=AlertResponse, status_code=201)
 def create_alert_from_ids(payload: IdsAlertCreate, session: Session = Depends(get_db)) -> AlertResponse:
     """Run the existing trained IDS then persist its real classification as an alert."""
