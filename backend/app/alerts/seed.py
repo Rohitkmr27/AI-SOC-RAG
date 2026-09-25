@@ -5,7 +5,7 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.alerts.models import Alert, AlertSeverity, AlertStatus
-from app.database import SessionLocal
+from app.database import get_session_factory
 
 
 SAMPLE_ALERTS = [
@@ -147,7 +147,7 @@ def seed_alerts(session: Session) -> List[Alert]:
 
 
 if __name__ == "__main__":
-    session = SessionLocal()
+    session = get_session_factory()()
     try:
         alerts = seed_alerts(session)
         print(f"Successfully seeded {len(alerts)} sample alerts into database.")
