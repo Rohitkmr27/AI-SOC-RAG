@@ -67,6 +67,18 @@ app.include_router(alerts_router)
 app.include_router(rag_router)
 
 
+@app.get("/")
+async def root() -> dict[str, str]:
+    """Return basic info and documentation path for root GET requests."""
+    return {
+        "status": "ok",
+        "service": "ai-soc-rag-backend",
+        "message": "AI-SOC-RAG Backend API is running.",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 @app.get("/api/health")
 @app.get("/api/v1/health")
@@ -75,4 +87,5 @@ async def health_check() -> dict[str, str]:
     """Return a simple readiness confirmation for the backend service."""
     logger.debug("Health endpoint requested")
     return {"status": "ok", "service": "ai-soc-rag-backend"}
+
 

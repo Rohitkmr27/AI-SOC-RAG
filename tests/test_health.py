@@ -22,3 +22,16 @@ def test_health_endpoint_returns_service_status() -> None:
         "status": "ok",
         "service": "ai-soc-rag-backend",
     }
+
+
+def test_root_endpoint_returns_service_info() -> None:
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["service"] == "ai-soc-rag-backend"
+    assert "docs" in data
+
